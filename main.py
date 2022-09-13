@@ -134,13 +134,6 @@ def singleTest(name, dic_pro, dic_cap, imageOrFrame, show3D, save, excel_path, e
                 print('Process terminated. Please replace the seed! Thanks!')
 
     if isValid:
-        # imageName = dic_cap + '0001.bmp'
-        # src = cv2.imread(imageName)
-        # new_img = src[50:100, 270:360]
-        # vintV = getVintValue(new_img)
-        # print(vintV)
-        # vintV = 100
-
         l, w, h, v = CalculateVolume(name, dic_pro, vintV, pixPerMMAtZ, imageWidth, imageHeight, show3D,
                                      save, excel_path, excelfile, excelSheet, sheetRow, middle_original)
         print("Total time: --- %0.3f seconds ---" % (time() - startTime) + "\n")
@@ -158,64 +151,60 @@ def singleTest(name, dic_pro, dic_cap, imageOrFrame, show3D, save, excel_path, e
 def setUpWindow():
     window = tk.Tk()
 
-    # height = int(window.winfo_screenheight() / 2 * 0.6)
-    # width = int(window.winfo_screenwidth() / 2 * 0.5)
-    height = int(window.winfo_screenheight() / 1.5)
-    width = int(window.winfo_screenwidth() / 2)
-    midGap = 60
+    # height = int(window.winfo_screenheight() / 1.5)
+    # width = int(window.winfo_screenwidth() / 2)
+    height = 576
+    width = 768
+    midGap = 40     # col gap
     print(height)
     print(width)
 
     window.title('Volume Calculating')
     window.geometry('%sx%s' % (width, height))
 
-    eleWidth_1 = width * 5 / 24                   # element's width
-    start_X = width/2 - eleWidth_1 * 2 - midGap/2      # the left border
+    eleWidth_label = width / 4 - (midGap * 0.75)    # element's width
+    eleHeight_label = height / 20       # element's height
+    start_X = midGap / 2    # the left border
+    start_Y = eleHeight_label   # the top border
 
-    eleHeight_1 = height / 15   # element's height
-    start_Y = eleHeight_1   # the top border
+    eleWidth_text = eleWidth_label * 2 + midGap/2  # "TEXT" width
+    eleHeight_text = int(eleHeight_label * 8)      # "TEXT" height
 
-    eleWidth_2 = eleWidth_1 * 2  # "TEXT" width
-    eleHeight_2 = int(eleHeight_1 * 7)   # "TEXT" height
+    secondCol_X = start_X + eleWidth_label + midGap/2   # the second col
+    thirdCol_X = width / 2 + midGap/2  # the third col
 
-    secondCol_X = width/2 - eleWidth_1 - midGap/2  # the second col
-    thirdCol_X = width/2 + midGap/2             # the third col
-    rowGap = eleHeight_1    #
-    fontSize = 8                                # the font of the content
+    rowGap = eleHeight_label + 15
+    fontSize = 18   # the font of the content
 
     # #################  create elements per row ##############################################
-    # display text, to show the result ########################################################
-    text_display = tk.Text(window, font=('Arial', 7))
-    text_display.configure(state='disabled')
-    text_display.place(x=thirdCol_X, y=eleHeight_2+10, width=eleWidth_2, height=eleHeight_2)
 
     # "user name" #############################################################################
     tk.Label(window, text='User Name: ', font=('Arial', fontSize)).place(x=start_X, y=start_Y)
     var_usr_name = tk.StringVar()
     var_usr_name.set(' ')
     entry_usr_name = tk.Entry(window, textvariable=var_usr_name, font=('Arial', fontSize))
-    entry_usr_name.place(x=secondCol_X, y=start_Y, width=eleWidth_1)
+    entry_usr_name.place(x=secondCol_X, y=start_Y, width=eleWidth_label)
 
     # "seed category" #########################################################################
     start_Y += rowGap
     tk.Label(window, text='Seed Category: ', font=('Arial', fontSize)).place(x=start_X, y=start_Y)
     list_seed_category = ["wheat", "milo", "other"]
     box_seed_category = ttk.Combobox(window, values=list_seed_category, state="readonly", font=('Arial', fontSize))
-    box_seed_category.place(x=secondCol_X, y=start_Y, height=35, width=eleWidth_1)
+    box_seed_category.place(x=secondCol_X, y=start_Y, height=35, width=eleWidth_label)
 
     # "seed type" #############################################################################
     start_Y += rowGap
     tk.Label(window, text='Seed Type: ', font=('Arial', fontSize)).place(x=start_X, y=start_Y)
     var_seed_type = tk.StringVar()
     entry_seed_type = tk.Entry(window, textvariable=var_seed_type, font=('Arial', fontSize))
-    entry_seed_type.place(x=secondCol_X, y=start_Y, width=eleWidth_1)
+    entry_seed_type.place(x=secondCol_X, y=start_Y, width=eleWidth_label)
 
     # "seed id" ###############################################################################
     start_Y += rowGap
     tk.Label(window, text='Seed ID: ', font=('Arial', fontSize)).place(x=start_X, y=start_Y)
     var_seed_id = tk.StringVar()
     entry_seed_id = tk.Entry(window, textvariable=var_seed_id, font=('Arial', fontSize))
-    entry_seed_id.place(x=secondCol_X, y=start_Y, width=eleWidth_1)
+    entry_seed_id.place(x=secondCol_X, y=start_Y, width=eleWidth_label)
 
     # "whether show 3d model" ##################################################################
     start_Y += rowGap
@@ -224,10 +213,10 @@ def setUpWindow():
     button_show_model.place(x=start_X, y=start_Y)
 
     # running text #############################################################################
-    start_Y += (rowGap * 2 + 10)
-    text_running = tk.Text(window, font=('Arial', 5))
+    start_Y += (rowGap * 2 + 20)
+    text_running = tk.Text(window, font=('Arial', 10))
     text_running.configure(state='disabled')
-    text_running.place(x=start_X, y=start_Y, width=eleWidth_2, height=eleHeight_2)
+    text_running.place(x=start_X, y=start_Y, width=eleWidth_text, height=eleHeight_text)
 
     # Redirect class.
     # To show the detail(print) of the process.
@@ -259,6 +248,11 @@ def setUpWindow():
             sys.stderr = self.stderrbak
 
     mystd = myStdout()  # instantiate the redirect class.
+
+    # display text, to show the result ########################################################
+    text_display = tk.Text(window, font=('Arial', 14))
+    text_display.configure(state='disabled')
+    text_display.place(x=thirdCol_X, y=start_Y, width=eleWidth_text, height=eleHeight_text)
 
     # button: "run" and "exit" #################################################################
     start_Y -= (rowGap + 10)
@@ -310,11 +304,11 @@ def setUpWindow():
 
         # display image, to show the first image of 36 images
         img = Image.open(path_Process + 'ROI_0000.png')
-        new_img = img.resize((eleHeight_2, eleHeight_2))
+        new_img = img.resize((eleHeight_text, eleHeight_text))
         new_img.save(path_Process + 'Z.png')
         photo = tk.PhotoImage(file=path_Process + 'Z.png')
-        label_image = tk.Label(window, image=photo, width=eleHeight_2-50, height=eleHeight_2-50)
-        label_image.place(x=thirdCol_X, y=eleHeight_1)
+        label_image = tk.Label(window, image=photo, width=eleHeight_text, height=eleHeight_text)
+        label_image.place(x=thirdCol_X, y=eleHeight_label)
 
         # initial to empty
         # var_usr_name.set(' ')
@@ -324,9 +318,9 @@ def setUpWindow():
         text_running.configure(state='disabled')
 
     button_run = tk.Button(window, text='Run', font=('Arial', fontSize), command=running)
-    button_run.place(x=start_X+eleWidth_1/3, y=start_Y, width=eleWidth_1/2, height=eleHeight_1)
+    button_run.place(x=start_X+eleWidth_label/3, y=start_Y, width=eleWidth_label/2, height=eleHeight_label)
     button_exit = tk.Button(window, text='Exit', font=('Arial', fontSize), command=window.quit)
-    button_exit.place(x=secondCol_X+eleWidth_1/4, y=start_Y, width=eleWidth_1/2, height=eleHeight_1)
+    button_exit.place(x=secondCol_X+eleWidth_label/4, y=start_Y, width=eleWidth_label/2, height=eleHeight_label)
 
     ###########################################################################################
     window.mainloop()
