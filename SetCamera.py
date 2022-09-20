@@ -13,10 +13,22 @@ def FindCamera(camModel):
 
 def SetCamera(camera, path_Camera, propertyFile):
 
+    # read camera configure file to get brightness, gain, and exposure.
     with open(path_Camera + propertyFile) as f:
-        contents = f.read()
+        contents = f.read().split(" ")
         print(contents)
+        brightness_value = contents[1]
+        if brightness_value == 'auto':
+            brightness_value = 0
+        gain_value = contents[2]
+        if gain_value == 'auto':
+            gain_value = 0
+        exposure_value = contents[3]
+        if exposure_value == 'auto':
+            exposure_value = 0
+    print(exposure_value)
 
+    # set up camera.
     if camera.IsDevValid() == 1:
         # #Set a frame rate of 30 frames per second
         camera.SetFrameRate(30.0)
@@ -41,7 +53,7 @@ def SetCamera(camera, path_Camera, propertyFile):
         print("Exposure time abs: ", ExposureTime[0])
 
         # Set an absolute exposure time, given in fractions of seconds. 0.0303 is 1/30 second:
-        camera.SetPropertyAbsoluteValue("Exposure", "Value", 0.005)
+        camera.SetPropertyAbsoluteValue("Exposure", "Value", float(exposure_value))
 
         # # Proceed with Gain, since we have gain automatic, disable first. Then set values.
         Gainauto = [0]
@@ -49,16 +61,16 @@ def SetCamera(camera, path_Camera, propertyFile):
         print("Gain auto : ", Gainauto[0])
 
         camera.SetPropertySwitch("Gain", "Auto", 0)
-        camera.SetPropertyValue("Gain", "Value", 0)
+        camera.SetPropertyValue("Gain", "Value", gain_value)
 
         # Same goes with white balance. We make a complete red image:
         WhiteBalanceAuto = [0]
-        camera.SetPropertySwitch("WhiteBalance", "Auto", 1)
-        camera.GetPropertySwitch("WhiteBalance", "Auto", WhiteBalanceAuto)
-        print("WB auto : ", WhiteBalanceAuto[0])
+        # camera.SetPropertySwitch("WhiteBalance", "Auto", 1)
+        # camera.GetPropertySwitch("WhiteBalance", "Auto", WhiteBalanceAuto)
+        # print("WB auto : ", WhiteBalanceAuto[0])
 
         camera.SetPropertySwitch("WhiteBalance", "Auto", 0)
-        camera.GetPropertySwitch("WhiteBalance", "Auto", WhiteBalanceAuto)
+        camera.SetPropertyValue("WhiteBalance", "Value", brightness_value)
         print("WB auto : ", WhiteBalanceAuto[0])
     else:
         print("No device selected")

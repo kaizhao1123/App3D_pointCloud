@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter import END, messagebox
 from tkinter import ttk
-from PIL import Image
+from PIL import Image, ImageTk
 from CalculateVolume import CalculateVolume
 from CapturePicturesFromVideo import getImagesFromVideo
 from CapturePicturesFromVideo import storeImagesIntoProcess
@@ -11,6 +11,7 @@ import sys
 import xlrd
 from xlutils.copy import copy
 from SetCamera import FindCamera, SetCamera
+import cv2
 
 # #### default parameters for project ####
 
@@ -59,6 +60,17 @@ def setUpMenuBar():
     menuBar.add_cascade(label='File', menu=fileMenu)
 
     # add elements into File menu
+
+    # the function for "wheat"
+    def wheatSetting():
+        propertyFile = 'wheat.txt'
+        messagebox.showinfo("showinfo", "Set the light level to 1 or 2! If you use default property of CAM.")
+
+    # the function for "milo"
+    def miloSetting():
+        propertyFile = 'milo.txt'
+        messagebox.showinfo("showinfo", "Set the light level to 3! If you use default property of CAM.")
+
     loadMenu = tk.Menu(fileMenu)  # for load different file
     loadMenu.add_command(label='wheat', command=wheatSetting, font=font_menu)
     loadMenu.add_command(label='milo', command=miloSetting, font=font_menu)
@@ -73,26 +85,14 @@ def setUpMenuBar():
     menuBar.add_cascade(label='Device', menu=deviceMenu)
 
     # add elements into Device menu
-    deviceMenu.add_command(label='Property', command=deviceProperty, font=font_menu)
+    deviceMenu.add_command(label='Property', command=createWindowForDeviceProperty, font=font_menu)
 
     # display menu bar in the window
     window.config(menu=menuBar)
 
 
-# the function for "wheat"
-def wheatSetting():
-    propertyFile = 'wheat.txt'
-    messagebox.showinfo("showinfo", "Set the light level to 1 or 2! If you use default property of CAM.")
-
-
-# the function for "milo"
-def miloSetting():
-    propertyFile = 'milo.txt'
-    messagebox.showinfo("showinfo", "Set the light level to 3! If you use default property of CAM.")
-
-
-# the function for "deviceProperty"
-def deviceProperty():
+# create a sub window for device property setting.
+def createWindowForDeviceProperty():
     window_property = tk.Toplevel(window)
     window_propertyHeight = int(windowHeight / 1.5)
     window_property.geometry('%sx%s' % (windowWidth, window_propertyHeight))
@@ -149,11 +149,84 @@ def deviceProperty():
     spinBox_Exposure.place(x=thirdCol_X, y=start_Y + 3, width=eleWidth_label * 0.5)
     checkButton_Exposure = tk.Checkbutton(window_property, text='Auto', font=('Arial', 12))
     checkButton_Exposure.place(x=fourthCol_X, y=start_Y + 3, width=eleWidth_label * 0.5, height=eleHeight_label)
+
+    # ######## display camera ########
+
+    frame_video = tk.Frame(window_property)
+    frame_video.place(x=windowWidth / 2 + midGap / 2, y=eleHeight_label)
+    label_video = tk.Label(frame_video)
+    label_video.grid()
+
+    # Capture from camera
+    cap = cv2.VideoCapture(1)
+
+    # function for video streaming
+    def video_stream():
+        _, frame = cap.read()
+        cv2image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGBA)
+        h, w, c = cv2image.shape
+        cv2image = cv2.resize(cv2image, (w // 2, h // 2), interpolation=cv2.INTER_AREA)
+        img = Image.fromarray(cv2image)
+        imgtk = ImageTk.PhotoImage(image=img)
+        label_video.imgtk = imgtk
+        label_video.configure(image=imgtk)
+        label_video.after(1, video_stream)
+
+    video_stream()
+
+    # canvas = tk.Canvas(window_property, height=windowWidth/2 - midGap, width=windowWidth/2 - midGap)
+    # class MyVideoCapture:
+    #     def __init__(self, video_source=0):
+    #         self.vid = cv2.VideoCapture(video_source)
+    #         if not self.vid.isOpened():
+    #             raise ValueError("Unable to open video source", video_source)
+    #
+    #         self.width = self.vid.get(cv2.CAP_PROP_FRAME_WIDTH)
+    #         self.height = self.vid.get(cv2.CAP_PROP_FRAME_HEIGHT)
+    #
+    #     def get_frame(self):
+    #         if self.vid.isOpened():
+    #             ret, frame = self.vid.read()
+    #             if ret:
+    #                 return ret, cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    #             else:
+    #                 return ret, None
+    #
+    #     def __del__(self):
+    #         if self.vid.isOpened():
+    #             self.vid.release()
+    #
+    # #
+    # videoCapture = MyVideoCapture(0)
+    # ret, frame = videoCapture.get_frame()
+    # while ret:
+    #     photo = ImageTk.PhotoImage(image=Image.fromarray(frame))
+    #     canvas.create_image(0, 0, image=photo, anchor=tk.NW)
+    #     window_property.after(10)
+    # canvas.place(x=windowWidth/2 + midGap/2, y=eleHeight_label)
+
+    #
+    # ######## buttons ########
+    def button_ok_setting():
+        videoCapture.__del__()
+        window_property.destroy
+
+    def button_cancel_setting():
+        videoCapture.__del__()
+        window_property.destroy
+
+    start_Y += (rowGap * 4)
+    button_ok = tk.Button(window_property, text='OK', font=('Arial', fontSize_label-5), command=button_ok_setting)
+    button_ok.place(x=secondCol_X - midGap, y=start_Y, width=eleWidth_label*0.5, height=eleHeight_label)
+    button_cancel = tk.Button(window_property, text='Cancel', font=('Arial', fontSize_label-5), command=button_cancel_setting)
+    button_cancel.place(x=thirdCol_X - midGap, y=start_Y, width=eleWidth_label*0.5, height=eleHeight_label)
+
+
 # #################################################################################################################
 
 
 # set up the contents in window ##############################
-def setUpContents(path_fileName, path_Capture, path_Process):
+def setUpContents(path_fileName, path_Capture, path_Process, path_Camera):
     # height = 576
     # width = 768
     midGap = 40  # col gap
@@ -396,11 +469,13 @@ def singleTest(name, dic_pro, dic_cap, imageOrFrame, show3D, save, excel_path, e
 # set up the window
 def createUI(path_fileName, path_Capture, path_Process, path_Camera):
 
-    # create UI
-    setUpMenuBar()
-    setUpContents(path_fileName, path_Capture, path_Process)
-
     # set up camera
     cam = FindCamera('DFK 37BUX287 15910406')
     SetCamera(cam, path_Camera, propertyFile)
     cam.StopLive()
+
+    # create UI
+    setUpMenuBar()
+    setUpContents(path_fileName, path_Capture, path_Process, path_Camera)
+
+
