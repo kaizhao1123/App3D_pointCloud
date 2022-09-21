@@ -1,3 +1,4 @@
+import math
 import tkinter as tk
 from tkinter import END, messagebox
 from tkinter import ttk
@@ -17,7 +18,7 @@ import cv2
 
 stored = True  # whether store the results into the excel file
 captureSrc = 'video'
-propertyFile = 'default.txt'    # the file with the camera default setting.
+propertyFile = 'default.txt'  # the file with the camera default setting.
 
 # about the carving algorithm ###################
 pixPerMMAtZ = 129 / 6.63  # 80 / 3.94  # new device
@@ -38,6 +39,8 @@ windowHeight = int(window.winfo_screenheight() / 1.5)
 windowWidth = int(window.winfo_screenwidth() / 2)
 font_menu = 'Arial 14'  # the font of the menu
 fontSize_label = 18  # the font of the content
+
+
 # ################################################
 
 
@@ -105,7 +108,7 @@ def createWindowForDeviceProperty():
     start_Y = eleHeight_label  # the top border
 
     secondCol_X = start_X + eleWidth_label + midGap / 4  # the second col
-    thirdCol_X = secondCol_X + eleWidth_label + midGap / 8  # the third col
+    thirdCol_X = secondCol_X + eleWidth_label + midGap / 16  # the third col
     fourthCol_X = thirdCol_X + eleWidth_label / 2 + midGap / 8  # the fourth col
 
     rowGap = eleHeight_label + 15  # the gap between row
@@ -141,31 +144,46 @@ def createWindowForDeviceProperty():
     tk.Label(window_property, text='Exposure: ', font=('Arial', fontSize_label)).place(x=start_X, y=start_Y)
     val_Exposure = tk.StringVar()
     scale_Exposure = tk.Scale(window_property, orient=tk.HORIZONTAL, length=eleWidth_label, width=eleHeight_label,
-                              from_=1/250, to=1, sliderlength=10, showvalue=False, resolution=0.01,
+                              from_=0, to=0.5, sliderlength=10, showvalue=False, resolution=0.0005,
                               variable=val_Exposure)
     scale_Exposure.place(x=secondCol_X, y=start_Y, width=eleWidth_label)
-    spinBox_Exposure = tk.Spinbox(window_property, from_=1/250, to=1, font=('Arial', 14), increment=0.01,
+
+    spinBox_Exposure = tk.Spinbox(window_property, from_=0, to=0.5, font=('Arial', 14),
+                                  increment=0.0005,
                                   textvariable=val_Exposure)
-    spinBox_Exposure.place(x=thirdCol_X, y=start_Y + 3, width=eleWidth_label * 0.5)
+    spinBox_Exposure.place(x=thirdCol_X, y=start_Y + 3, width=eleWidth_label * 0.5+20)
+
     checkButton_Exposure = tk.Checkbutton(window_property, text='Auto', font=('Arial', 12))
-    checkButton_Exposure.place(x=fourthCol_X, y=start_Y + 3, width=eleWidth_label * 0.5, height=eleHeight_label)
+    checkButton_Exposure.place(x=fourthCol_X+20, y=start_Y + 3, width=eleWidth_label * 0.5, height=eleHeight_label)
 
     # ######## display camera ########
 
     frame_video = tk.Frame(window_property)
-    frame_video.place(x=windowWidth / 2 + midGap / 2, y=eleHeight_label)
+    frame_video.place(x=windowWidth / 2 + midGap / 2+20, y=eleHeight_label)
     label_video = tk.Label(frame_video)
     label_video.grid()
 
     # Capture from camera
     cap = cv2.VideoCapture(1)
 
+    # setup exposure value
+    def setUpExposure():
+        v = val_Exposure.get()
+        if float(v) == 0:
+            v = 1 / (math.pow(2, 13))
+        temp = math.log2(1 / float(v))
+        cap.set(cv2.CAP_PROP_EXPOSURE, -temp)
+
     # function for video streaming
     def video_stream():
+        # cap.set(cv2.CAP_PROP_EXPOSURE, -4)
+        # temp = int(math.log2(1 / float(val_Exposure)))
+        # cap.set(cv2.CAP_PROP_EXPOSURE, -temp)
+        setUpExposure()
         _, frame = cap.read()
         cv2image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGBA)
         h, w, c = cv2image.shape
-        cv2image = cv2.resize(cv2image, (w // 2, h // 2), interpolation=cv2.INTER_AREA)
+        cv2image = cv2.resize(cv2image, (w // 2, h // 2), interpolation=cv2.INTER_AREA)  # to fit for the window size.
         img = Image.fromarray(cv2image)
         imgtk = ImageTk.PhotoImage(image=img)
         label_video.imgtk = imgtk
@@ -208,18 +226,17 @@ def createWindowForDeviceProperty():
     #
     # ######## buttons ########
     def button_ok_setting():
-        videoCapture.__del__()
         window_property.destroy
 
     def button_cancel_setting():
-        videoCapture.__del__()
         window_property.destroy
 
     start_Y += (rowGap * 4)
-    button_ok = tk.Button(window_property, text='OK', font=('Arial', fontSize_label-5), command=button_ok_setting)
-    button_ok.place(x=secondCol_X - midGap, y=start_Y, width=eleWidth_label*0.5, height=eleHeight_label)
-    button_cancel = tk.Button(window_property, text='Cancel', font=('Arial', fontSize_label-5), command=button_cancel_setting)
-    button_cancel.place(x=thirdCol_X - midGap, y=start_Y, width=eleWidth_label*0.5, height=eleHeight_label)
+    button_ok = tk.Button(window_property, text='OK', font=('Arial', fontSize_label - 5), command=button_ok_setting)
+    button_ok.place(x=secondCol_X - midGap, y=start_Y, width=eleWidth_label * 0.5, height=eleHeight_label)
+    button_cancel = tk.Button(window_property, text='Cancel', font=('Arial', fontSize_label - 5),
+                              command=button_cancel_setting)
+    button_cancel.place(x=thirdCol_X - midGap, y=start_Y, width=eleWidth_label * 0.5, height=eleHeight_label)
 
 
 # #################################################################################################################
@@ -400,6 +417,8 @@ def setUpContents(path_fileName, path_Capture, path_Process, path_Camera):
     ################
     window.mainloop()
     mystd.restoreStd()  # Restore standard output.
+
+
 # ###################################################################################################################
 
 
@@ -468,7 +487,6 @@ def singleTest(name, dic_pro, dic_cap, imageOrFrame, show3D, save, excel_path, e
 
 # set up the window
 def createUI(path_fileName, path_Capture, path_Process, path_Camera):
-
     # set up camera
     cam = FindCamera('DFK 37BUX287 15910406')
     SetCamera(cam, path_Camera, propertyFile)
@@ -477,5 +495,3 @@ def createUI(path_fileName, path_Capture, path_Process, path_Camera):
     # create UI
     setUpMenuBar()
     setUpContents(path_fileName, path_Capture, path_Process, path_Camera)
-
-
