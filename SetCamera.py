@@ -1,10 +1,10 @@
+# come from https://github.com/elerac/IC-Imaging-Control
 import tisgrabber as IC
 
 
 def FindCamera(camModel):
     # Create the camera object.
     Camera = IC.TIS_CAM()
-
     # Open a device with hard coded unique name:
     Camera.open(camModel)
 
@@ -20,12 +20,18 @@ def SetCamera(camera, path_Camera, propertyFile):
         brightness_value = contents[1]
         if brightness_value == 'auto':
             brightness_value = 0
+        else:
+            brightness_value = int(float(brightness_value))
         gain_value = contents[2]
         if gain_value == 'auto':
             gain_value = 0
+        else:
+            gain_value = int(float(gain_value))
         exposure_value = contents[3]
         if exposure_value == 'auto':
-            exposure_value = 0
+            exposure_value = 0.0
+        else:
+            exposure_value = float(exposure_value)
     print(exposure_value)
 
     # set up camera.
@@ -53,7 +59,7 @@ def SetCamera(camera, path_Camera, propertyFile):
         print("Exposure time abs: ", ExposureTime[0])
 
         # Set an absolute exposure time, given in fractions of seconds. 0.0303 is 1/30 second:
-        camera.SetPropertyAbsoluteValue("Exposure", "Value", float(exposure_value))
+        camera.SetPropertyAbsoluteValue("Exposure", "Value", exposure_value)
 
         # # Proceed with Gain, since we have gain automatic, disable first. Then set values.
         Gainauto = [0]

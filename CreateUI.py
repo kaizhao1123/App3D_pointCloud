@@ -11,14 +11,16 @@ from time import time
 import sys
 import xlrd
 from xlutils.copy import copy
-from SetCamera import FindCamera, SetCamera
 import cv2
+from SetCamera import FindCamera, SetCamera
+
 
 # #### default parameters for project ####
-
 stored = True  # whether store the results into the excel file
 captureSrc = 'video'
 propertyFile = 'default.txt'  # the file with the camera default setting.
+pathCamera = ' '
+cameraName = ' '
 
 # about the carving algorithm ###################
 pixPerMMAtZ = 129 / 6.63  # 80 / 3.94  # new device
@@ -55,7 +57,7 @@ def ReadFromResult(file):
 
 
 # #################  create menu bar #########################################################
-def setUpMenuBar():
+def setUpMenuBar(path_Camera, camera_name):
     menuBar = tk.Menu(window)
 
     # ### 1. create File menu ###
@@ -66,12 +68,20 @@ def setUpMenuBar():
 
     # the function for "wheat"
     def wheatSetting():
-        propertyFile = 'wheat.txt'
+        global propertyFile
+        propertyFile = 'default_wheat.txt'
+        # cam = FindCamera(camera_name)
+        # SetCamera(cam, path_Camera, 'default_wheat.txt')
+        # cam.StopLive()
         messagebox.showinfo("showinfo", "Set the light level to 1 or 2! If you use default property of CAM.")
 
     # the function for "milo"
     def miloSetting():
-        propertyFile = 'milo.txt'
+        global propertyFile
+        propertyFile = 'default_milo.txt'
+        # cam = FindCamera(camera_name)
+        # SetCamera(cam, path_Camera, 'default_milo.txt')
+        # cam.StopLive()
         messagebox.showinfo("showinfo", "Set the light level to 3! If you use default property of CAM.")
 
     loadMenu = tk.Menu(fileMenu)  # for load different file
@@ -151,35 +161,54 @@ def createWindowForDeviceProperty():
     spinBox_Exposure = tk.Spinbox(window_property, from_=0, to=0.5, font=('Arial', 14),
                                   increment=0.0005,
                                   textvariable=val_Exposure)
-    spinBox_Exposure.place(x=thirdCol_X, y=start_Y + 3, width=eleWidth_label * 0.5+20)
+    spinBox_Exposure.place(x=thirdCol_X, y=start_Y + 3, width=eleWidth_label * 0.5 + 20)
 
     checkButton_Exposure = tk.Checkbutton(window_property, text='Auto', font=('Arial', 12))
-    checkButton_Exposure.place(x=fourthCol_X+20, y=start_Y + 3, width=eleWidth_label * 0.5, height=eleHeight_label)
+    checkButton_Exposure.place(x=fourthCol_X + 20, y=start_Y + 3, width=eleWidth_label * 0.5, height=eleHeight_label)
 
     # ######## display camera ########
-
     frame_video = tk.Frame(window_property)
-    frame_video.place(x=windowWidth / 2 + midGap / 2+20, y=eleHeight_label)
+    frame_video.place(x=windowWidth / 2 + midGap / 2 + 20, y=eleHeight_label)
     label_video = tk.Label(frame_video)
     label_video.grid()
 
     # Capture from camera
     cap = cv2.VideoCapture(1)
 
-    # setup exposure value
+    #  #### test to get the exposure value. ####
+    var_test = tk.StringVar()
+    label_test = tk.Label(window_property, textvariable=var_test, bg='green', fg='white', font=('Arial', 12),
+                          width=230, height=2)
+    label_test.place(x=100, y=200, width=200, height=30)
+
+    # setup exposure value.
+    # Windows – exposure times are selected from a table where index ranges typically from 0 to -13. Value 0 means the
+    # longest exposure and -13 is the shortest time (fastest shutter). Windows indexed exposure values are a logarithmic
+    # function of time. The equation is very simple EXP_TIME = 2^(-EXP_VAL)
     def setUpExposure():
         v = val_Exposure.get()
         if float(v) == 0:
             v = 1 / (math.pow(2, 13))
-        temp = math.log2(1 / float(v))
+        temp = round(math.log2(1 / float(v)), 2)
+        # var_test.set(temp)
         cap.set(cv2.CAP_PROP_EXPOSURE, -temp)
+
+    def setUpBrightness():
+        v = val_brightness.get()
+        # var_test.set(v)
+        cap.set(cv2.CAP_PROP_BRIGHTNESS, float(v))
+
+    def setUpGain():
+        v = val_Gain.get()
+        # var_test.set(v)
+        cap.set(cv2.CAP_PROP_GAIN, float(v))
 
     # function for video streaming
     def video_stream():
-        # cap.set(cv2.CAP_PROP_EXPOSURE, -4)
-        # temp = int(math.log2(1 / float(val_Exposure)))
-        # cap.set(cv2.CAP_PROP_EXPOSURE, -temp)
         setUpExposure()
+        setUpBrightness()
+        setUpGain()
+        cap.set(cv2.CAP_PROP_FPS, 30.0)
         _, frame = cap.read()
         cv2image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGBA)
         h, w, c = cv2image.shape
@@ -192,44 +221,24 @@ def createWindowForDeviceProperty():
 
     video_stream()
 
-    # canvas = tk.Canvas(window_property, height=windowWidth/2 - midGap, width=windowWidth/2 - midGap)
-    # class MyVideoCapture:
-    #     def __init__(self, video_source=0):
-    #         self.vid = cv2.VideoCapture(video_source)
-    #         if not self.vid.isOpened():
-    #             raise ValueError("Unable to open video source", video_source)
-    #
-    #         self.width = self.vid.get(cv2.CAP_PROP_FRAME_WIDTH)
-    #         self.height = self.vid.get(cv2.CAP_PROP_FRAME_HEIGHT)
-    #
-    #     def get_frame(self):
-    #         if self.vid.isOpened():
-    #             ret, frame = self.vid.read()
-    #             if ret:
-    #                 return ret, cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    #             else:
-    #                 return ret, None
-    #
-    #     def __del__(self):
-    #         if self.vid.isOpened():
-    #             self.vid.release()
-    #
-    # #
-    # videoCapture = MyVideoCapture(0)
-    # ret, frame = videoCapture.get_frame()
-    # while ret:
-    #     photo = ImageTk.PhotoImage(image=Image.fromarray(frame))
-    #     canvas.create_image(0, 0, image=photo, anchor=tk.NW)
-    #     window_property.after(10)
-    # canvas.place(x=windowWidth/2 + midGap/2, y=eleHeight_label)
-
     #
     # ######## buttons ########
     def button_ok_setting():
-        window_property.destroy
+        property_result = [30.0, float(val_brightness.get()), float(val_Gain.get()), float(val_Exposure.get())]
+        p = pathCamera + 'currentProperty.txt'
+        with open(p, 'w') as f:
+            f.write(" ".join(str(item) for item in property_result))
+        #var_test.set(property_result)
+        global propertyFile
+        propertyFile = 'currentProperty.txt'
+        cap.release()
+        window_property.destroy()
 
     def button_cancel_setting():
-        window_property.destroy
+        # cam = FindCamera(cameraName)
+        # SetCamera(cam, pathCamera, propertyFile)
+        # cam.StopLive()
+        window_property.destroy()
 
     start_Y += (rowGap * 4)
     button_ok = tk.Button(window_property, text='OK', font=('Arial', fontSize_label - 5), command=button_ok_setting)
@@ -243,7 +252,7 @@ def createWindowForDeviceProperty():
 
 
 # set up the contents in window ##############################
-def setUpContents(path_fileName, path_Capture, path_Process, path_Camera):
+def setUpContents(path_fileName, path_Capture, path_Process, path_Camera, camera_name):
     # height = 576
     # width = 768
     midGap = 40  # col gap
@@ -351,6 +360,11 @@ def setUpContents(path_fileName, path_Capture, path_Process, path_Camera):
 
     # ###### function for button "run" in the UI ######
     def running():
+        # cam = FindCamera('DFK 37BUX287 15910406')
+        cam = FindCamera(camera_name)
+        SetCamera(cam, path_Camera, propertyFile)
+        cam.StopLive()
+
         rowCount, wb = ReadFromResult(path_fileName)
         sheet1 = wb.get_sheet(0)
 
@@ -486,12 +500,17 @@ def singleTest(name, dic_pro, dic_cap, imageOrFrame, show3D, save, excel_path, e
 
 
 # set up the window
-def createUI(path_fileName, path_Capture, path_Process, path_Camera):
+def createUI(path_fileName, path_Capture, path_Process, path_Camera, camera_Name):
     # set up camera
-    cam = FindCamera('DFK 37BUX287 15910406')
-    SetCamera(cam, path_Camera, propertyFile)
-    cam.StopLive()
+    # when press "run" without any setting up cam, the cam uses the default configure.
+    # cam = FindCamera(camera_Name)
+    # SetCamera(cam, path_Camera, propertyFile)
+    # cam.StopLive()
+
+    global pathCamera, cameraName
+    pathCamera = path_Camera
+    cameraName = camera_Name
 
     # create UI
-    setUpMenuBar()
-    setUpContents(path_fileName, path_Capture, path_Process, path_Camera)
+    setUpMenuBar(path_Camera, camera_Name)
+    setUpContents(path_fileName, path_Capture, path_Process, path_Camera, camera_Name)
