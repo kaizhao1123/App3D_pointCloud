@@ -2,6 +2,7 @@ import math
 import tkinter as tk
 from tkinter import END, messagebox
 from tkinter import ttk
+from tkinter import filedialog as fd
 from PIL import Image, ImageTk
 from CalculateVolume import CalculateVolume
 from CapturePicturesFromVideo import getImagesFromVideo
@@ -12,17 +13,18 @@ import sys
 import xlrd
 from xlutils.copy import copy
 import cv2
-from SetCamera import FindCamera, SetCamera
+from SetCamera import FindCamera, SetCamera, SetCamera_Exposure
 
-
-# #### default parameters for project ####
+# #### default parameters for project ###########
 stored = True  # whether store the results into the excel file
 captureSrc = 'video'
 propertyFile = 'default.txt'  # the file with the camera default setting.
 pathCamera = ' '
 cameraName = ' '
+camera_auto_Exposure = 0
+camera_manual_Exposure = 0
 
-# about the carving algorithm ###################
+# parameters about the carving algorithm #########
 pixPerMMAtZ = 129 / 6.63  # 80 / 3.94  # new device
 # the middle of height of original image, to ensure the bottom of seed is on this line level when cropping.
 middle_original = 240
@@ -33,12 +35,15 @@ vintForMilo = 50
 vintForOther = 70
 # ################################################
 
-# define the window (UI)
+# define the window (UI) #########################
 window = tk.Tk()
-
 # some properties of the window.
 windowHeight = int(window.winfo_screenheight() / 1.5)
 windowWidth = int(window.winfo_screenwidth() / 2)
+# windowHeight = 576
+# windowWidth = 768
+print(windowHeight)
+print(windowWidth)
 font_menu = 'Arial 14'  # the font of the menu
 fontSize_label = 18  # the font of the content
 
@@ -46,7 +51,7 @@ fontSize_label = 18  # the font of the content
 # ################################################
 
 
-# ############## functions ################
+# ############## functions #######################
 # open the excel file.
 def ReadFromResult(file):
     result = xlrd.open_workbook(file)
@@ -60,40 +65,65 @@ def ReadFromResult(file):
 def setUpMenuBar(path_Camera, camera_name):
     menuBar = tk.Menu(window)
 
-    # ### 1. create File menu ###
+    # ### 1. create File menu ############################
     fileMenu = tk.Menu(menuBar, tearoff=0)
     menuBar.add_cascade(label='File', menu=fileMenu)
 
-    # add elements into File menu
-
+    # add elements into File menu ###############
     # the function for "wheat"
     def wheatSetting():
         global propertyFile
         propertyFile = 'default_wheat.txt'
-        # cam = FindCamera(camera_name)
-        # SetCamera(cam, path_Camera, 'default_wheat.txt')
-        # cam.StopLive()
         messagebox.showinfo("showinfo", "Set the light level to 1 or 2! If you use default property of CAM.")
 
     # the function for "milo"
     def miloSetting():
         global propertyFile
         propertyFile = 'default_milo.txt'
-        # cam = FindCamera(camera_name)
-        # SetCamera(cam, path_Camera, 'default_milo.txt')
-        # cam.StopLive()
         messagebox.showinfo("showinfo", "Set the light level to 3! If you use default property of CAM.")
+
+    # the function for "other", to choose property file
+    def otherSetting():
+        global propertyFile
+        filetypes = (
+            ('text files', '*.txt'),
+            ('All files', '*.*')
+        )
+        propertyFile = fd.askopenfilename(
+            title='Open a file',
+            initialdir=pathCamera,
+            filetypes=filetypes)
+
+        # for test ******
+        # messagebox.showinfo(
+        #     title='Selected File',
+        #     message=propertyFile
+        # )
 
     loadMenu = tk.Menu(fileMenu)  # for load different file
     loadMenu.add_command(label='wheat', command=wheatSetting, font=font_menu)
     loadMenu.add_command(label='milo', command=miloSetting, font=font_menu)
+    loadMenu.add_command(label='other', command=otherSetting, font=font_menu)
     fileMenu.add_cascade(label='Load Setting', menu=loadMenu, underline=0, font=font_menu)
 
-    fileMenu.add_command(label='Save Setting', font=font_menu)
+    # save current device configure into text file.
+    def saveSetting():
+        Files = [('All Files', '*.*'),
+                 ('Text Document', '*.txt')]
+        f = fd.asksaveasfile(title='save a file', initialdir=pathCamera, filetypes=Files, defaultextension=Files)
+        if f is None:  # asksaveasfile return `None` if dialog closed with "cancel".
+            return
+        global propertyFile
+        with open(pathCamera + propertyFile) as ff:
+            contents = ff.read().split(" ")
+            f.write(" ".join(str(item) for item in contents))
+            f.close()
+
+    fileMenu.add_command(label='Save Setting', command=saveSetting, font=font_menu)
     fileMenu.add_separator()
     fileMenu.add_command(label='Exit', command=window.quit, font=font_menu)
 
-    # ### 1. create Device menu ###
+    # ### 2. create Device menu ############################
     deviceMenu = tk.Menu(menuBar, tearoff=0)
     menuBar.add_cascade(label='Device', menu=deviceMenu)
 
@@ -111,104 +141,188 @@ def createWindowForDeviceProperty():
     window_property.geometry('%sx%s' % (windowWidth, window_propertyHeight))
     window_property.title('Set up device property')
 
+    # locate the position of each element and the gap between them ############################
     midGap = 40  # col gap
     eleWidth_label = windowWidth / 6 - (midGap / 6)  # element's width
     eleHeight_label = window_propertyHeight / 16  # element's height
     start_X = midGap / 4  # the left border
     start_Y = eleHeight_label  # the top border
-
     secondCol_X = start_X + eleWidth_label + midGap / 4  # the second col
     thirdCol_X = secondCol_X + eleWidth_label + midGap / 16  # the third col
     fourthCol_X = thirdCol_X + eleWidth_label / 2 + midGap / 8  # the fourth col
-
     rowGap = eleHeight_label + 15  # the gap between row
 
     # #################  create elements per row ##############################################
     # ###### "Brightness" #####
     tk.Label(window_property, text='Brightness: ', font=('Arial', fontSize_label)).place(x=start_X, y=start_Y)
-    val_brightness = tk.StringVar()
-    scale_brightness = tk.Scale(window_property, orient=tk.HORIZONTAL, length=eleWidth_label, width=eleHeight_label,
+    val_Brightness = tk.StringVar()
+
+    # for scale Brightness
+    def scale_Brightness_function(v):  # need the input parameter.
+        print("dd")
+        #cap.set(cv2.CAP_PROP_BRIGHTNESS, float(v))
+        #display_currentImage()
+
+    scale_Brightness = tk.Scale(window_property, orient=tk.HORIZONTAL, length=eleWidth_label, width=eleHeight_label,
                                 from_=0, to=4096, sliderlength=10, showvalue=False, resolution=1,
-                                variable=val_brightness)
-    scale_brightness.place(x=secondCol_X, y=start_Y, width=eleWidth_label)
-    spinBox_brightness = tk.Spinbox(window_property, from_=0, to=4096, font=('Arial', 14), increment=1,
-                                    textvariable=val_brightness)
-    spinBox_brightness.place(x=thirdCol_X, y=start_Y + 3, width=eleWidth_label * 0.5)
+                                variable=val_Brightness, command=scale_Brightness_function)
+    scale_Brightness.place(x=secondCol_X, y=start_Y, width=eleWidth_label)
+
+    # for spinBox Brightness.
+    def spinBox_Brightness_function():  # no input parameter.
+        v = val_Brightness.get()
+        #cap.set(cv2.CAP_PROP_BRIGHTNESS, float(v))
+        # display_currentImage()
+
+    spinBox_Brightness = tk.Spinbox(window_property, from_=0, to=4096, font=('Arial', 14), increment=1,
+                                    textvariable=val_Brightness, command=spinBox_Brightness_function)
+    spinBox_Brightness.place(x=thirdCol_X, y=start_Y + 3, width=eleWidth_label * 0.5)
 
     # ###### "Gain" #####
     start_Y += rowGap
     tk.Label(window_property, text='Gain: ', font=('Arial', fontSize_label)).place(x=start_X, y=start_Y)
     val_Gain = tk.StringVar()
+
+    # for scale gain.
+    def scale_Gain_function(v):  # need the input parameter.
+        #cap.set(cv2.CAP_PROP_GAIN, float(v))
+        #display_currentImage()
+        print("dd")
+
     scale_Gain = tk.Scale(window_property, orient=tk.HORIZONTAL, length=eleWidth_label, width=eleHeight_label,
-                          from_=0.00, to=48.00, sliderlength=10, showvalue=False, resolution=0.5,
-                          variable=val_Gain)
+                          from_=0, to=48, sliderlength=10, showvalue=False, resolution=1, variable=val_Gain,
+                          command=scale_Gain_function)
     scale_Gain.place(x=secondCol_X, y=start_Y, width=eleWidth_label)
-    spinBox_Gain = tk.Spinbox(window_property, from_=0.00, to=48.00, font=('Arial', 14), increment=0.5,
-                              textvariable=val_Gain)
+
+    # for spinBox gain.
+    def spinBox_Gain_function():  # no input parameter.
+        v = val_Gain.get()
+        #cap.set(cv2.CAP_PROP_GAIN, float(v))
+        #display_currentImage()
+
+    spinBox_Gain = tk.Spinbox(window_property, from_=0, to=48, font=('Arial', 14), increment=1, textvariable=val_Gain,
+                              command=spinBox_Gain_function)
     spinBox_Gain.place(x=thirdCol_X, y=start_Y + 3, width=eleWidth_label * 0.5)
+
+    # for checkButton gain
     checkButton_Gain = tk.Checkbutton(window_property, text='Auto', font=('Arial', 12))
     checkButton_Gain.place(x=fourthCol_X, y=start_Y + 3, width=eleWidth_label * 0.5, height=eleHeight_label)
 
-    # ###### "Exposure" #####                   #? the value is the fixed increase, not dynamic increase. #
+    # ###### "Exposure" #####                   #? the value is the fixed increase, not dynamic increase. ?#
     start_Y += rowGap
     tk.Label(window_property, text='Exposure: ', font=('Arial', fontSize_label)).place(x=start_X, y=start_Y)
     val_Exposure = tk.StringVar()
+
+    # ## about the exposure value: ##
+    # Windows – exposure times are selected from a table where index ranges typically from 0 to -13. Value 0 means the
+    # longest exposure and -13 is the shortest time (fastest shutter). Windows indexed exposure values are a logarithmic
+    # function of time. The equation is very simple EXP_TIME = 2^(-EXP_VAL)
+
+    # for scale exposure.
+    def scale_Exposure_function(v):  # need the input parameter.
+        if float(v) == 0:
+            v = 1 / (math.pow(2, 13))
+        temp = round(math.log2(1 / float(v)), 2)
+        # var_test.set(temp)  # test code
+        #cap.set(cv2.CAP_PROP_EXPOSURE, -temp)
+        # display_currentImage()
+
     scale_Exposure = tk.Scale(window_property, orient=tk.HORIZONTAL, length=eleWidth_label, width=eleHeight_label,
                               from_=0, to=0.5, sliderlength=10, showvalue=False, resolution=0.0005,
-                              variable=val_Exposure)
+                              variable=val_Exposure, command=scale_Exposure_function)
     scale_Exposure.place(x=secondCol_X, y=start_Y, width=eleWidth_label)
 
-    spinBox_Exposure = tk.Spinbox(window_property, from_=0, to=0.5, font=('Arial', 14),
-                                  increment=0.0005,
-                                  textvariable=val_Exposure)
+    # for spinBox exposure.
+    def spinBox_Exposure_function():  # no input parameter.
+        v = val_Exposure.get()
+        if float(v) == 0:
+            v = 1 / (math.pow(2, 13))
+        temp = round(math.log2(1 / float(v)), 2)
+        #var_test.set(temp)  # test code
+        #cap.set(cv2.CAP_PROP_EXPOSURE, -temp)
+        display_currentImage()
+
+    spinBox_Exposure = tk.Spinbox(window_property, from_=0, to=0.5, font=('Arial', 14), increment=0.0005,
+                                  textvariable=val_Exposure, command=spinBox_Exposure_function)
     spinBox_Exposure.place(x=thirdCol_X, y=start_Y + 3, width=eleWidth_label * 0.5 + 20)
 
-    checkButton_Exposure = tk.Checkbutton(window_property, text='Auto', font=('Arial', 12))
+
+    # #### test to get the exposure value. ####  # test code(for debug)
+    var_test = tk.StringVar()
+    label_test = tk.Label(window_property, textvariable=var_test, bg='green', fg='white', font=('Arial', 12),
+                          width=230, height=2)
+    label_test.place(x=100, y=200, width=200, height=30)
+
+
+
+
+    #################################//////////////////////////////////////////////////////
+    cap = cv2.VideoCapture(1)
+
+    # for checkButton exposure
+    val_Exposure_Check = tk.IntVar()
+    var_test.set(camera_auto_Exposure)
+    if float(camera_auto_Exposure) == 0:
+        v = 1 / (math.pow(2, 13))
+    temp = round(math.log2(1 / float(camera_auto_Exposure)), 2)
+
+    # var_test.set(-temp)  # test code
+    #cap.set(cv2.CAP_PROP_EXPOSURE, -temp)
+
+
+    def checkButton_Exposure_function():
+
+        cam = FindCamera(cameraName)
+        if val_Exposure_Check.get() == 1:
+            # if float(camera_auto_Exposure) == 0:
+            #     temp = 1 / (math.pow(2, 13))
+            # else:
+            #     temp = round(math.log2(1 / float(camera_auto_Exposure)), 2)
+            # var_test.set(-temp)  # test code
+            SetCamera_Exposure(cam, " ", 'auto')
+            spinBox_Exposure.config(state='disabled')
+        else:
+            if float(val_Exposure.get()) == 0:
+                temp = 1 / (math.pow(2, 13))
+            else:
+                temp = float(val_Exposure.get())
+            var_test.set(-temp)  # test code
+            SetCamera_Exposure(cam, temp, 'manual')
+            spinBox_Exposure.config(state='normal')
+ 
+        cam.StopLive()
+
+        display_currentImage()
+        # print("dd")
+
+    # #################################////////////////////////////////////////////////////////
+    checkButton_Exposure = tk.Checkbutton(window_property, text='Auto', variable=val_Exposure_Check, onvalue=1,
+                                          offvalue=0, font=('Arial', 12), command=checkButton_Exposure_function)
     checkButton_Exposure.place(x=fourthCol_X + 20, y=start_Y + 3, width=eleWidth_label * 0.5, height=eleHeight_label)
 
-    # ######## display camera ########
+    ############################################################################################
+    # ################################### display camera #######################################
     frame_video = tk.Frame(window_property)
     frame_video.place(x=windowWidth / 2 + midGap / 2 + 20, y=eleHeight_label)
     label_video = tk.Label(frame_video)
     label_video.grid()
 
     # Capture from camera
-    cap = cv2.VideoCapture(1)
+    # cap = cv2.VideoCapture(1)
+    #cap.set(cv2.CAP_PROP_EXPOSURE, -5)
+    #ret_val, cap_for_exposure = cap.read()
+    #cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.25)  # turn off "auto" on exposure
+    #cap.set(cv2.CAP_PROP_EXPOSURE, -5)
+    #cap.set(cv2.CAP_PROP_AUTO_WB, 0.25)  # turn off "auto" on white balance(gain)
+    # var_test.set(cap.get(cv2.CAP_PROP_EXPOSURE))  # test code
 
-    #  #### test to get the exposure value. ####
-    var_test = tk.StringVar()
-    label_test = tk.Label(window_property, textvariable=var_test, bg='green', fg='white', font=('Arial', 12),
-                          width=230, height=2)
-    label_test.place(x=100, y=200, width=200, height=30)
 
-    # setup exposure value.
-    # Windows – exposure times are selected from a table where index ranges typically from 0 to -13. Value 0 means the
-    # longest exposure and -13 is the shortest time (fastest shutter). Windows indexed exposure values are a logarithmic
-    # function of time. The equation is very simple EXP_TIME = 2^(-EXP_VAL)
-    def setUpExposure():
-        v = val_Exposure.get()
-        if float(v) == 0:
-            v = 1 / (math.pow(2, 13))
-        temp = round(math.log2(1 / float(v)), 2)
-        # var_test.set(temp)
-        cap.set(cv2.CAP_PROP_EXPOSURE, -temp)
 
-    def setUpBrightness():
-        v = val_brightness.get()
-        # var_test.set(v)
-        cap.set(cv2.CAP_PROP_BRIGHTNESS, float(v))
-
-    def setUpGain():
-        v = val_Gain.get()
-        # var_test.set(v)
-        cap.set(cv2.CAP_PROP_GAIN, float(v))
-
-    # function for video streaming
-    def video_stream():
-        setUpExposure()
-        setUpBrightness()
-        setUpGain()
-        cap.set(cv2.CAP_PROP_FPS, 30.0)
+    # display one image with current camera configure.
+    def display_currentImage():
+        cap = cv2.VideoCapture(1)
+        #cap.set(cv2.CAP_PROP_FPS, 30.0)
+        #cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.75)
         _, frame = cap.read()
         cv2image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGBA)
         h, w, c = cv2image.shape
@@ -217,27 +331,61 @@ def createWindowForDeviceProperty():
         imgtk = ImageTk.PhotoImage(image=img)
         label_video.imgtk = imgtk
         label_video.configure(image=imgtk)
-        label_video.after(1, video_stream)
+        cap.release()
 
-    video_stream()
-
+    display_currentImage()
+    ####################################################################
+    # function for video streaming, that is,  real time video.
+    # def setUpExposure():
+    #     v = val_Exposure.get()
+    #     if float(v) == 0:
+    #         v = 1 / (math.pow(2, 13))
+    #     temp = round(math.log2(1 / float(v)), 2)
+    #     # var_test.set(temp)  # test code
+    #     cap.set(cv2.CAP_PROP_EXPOSURE, -temp)
     #
+    # def setUpBrightness():
+    #     v = val_brightness.get()
+    #     # var_test.set(v) # test code
+    #     cap.set(cv2.CAP_PROP_BRIGHTNESS, float(v))
+    #
+    # def setUpGain():
+    #     v = val_Gain.get()
+    #     # var_test.set(v) # test code
+    #     cap.set(cv2.CAP_PROP_GAIN, float(v))
+    # def video_stream():
+    #     setUpExposure()
+    #     setUpBrightness()
+    #     setUpGain()
+    #     cap.set(cv2.CAP_PROP_FPS, 30.0)
+    #     _, frame = cap.read()
+    #     cv2image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGBA)
+    #     h, w, c = cv2image.shape
+    #     cv2image = cv2.resize(cv2image, (w // 2, h // 2), interpolation=cv2.INTER_AREA)  # to fit for the window size.
+    #     img = Image.fromarray(cv2image)
+    #     imgtk = ImageTk.PhotoImage(image=img)
+    #     label_video.imgtk = imgtk
+    #     label_video.configure(image=imgtk)
+    #     label_video.after(1, video_stream)
+    # video_stream()
+    ######################################################################
+
+    ##########################################################################################################
+
     # ######## buttons ########
     def button_ok_setting():
-        property_result = [30.0, float(val_brightness.get()), float(val_Gain.get()), float(val_Exposure.get())]
+        property_result = [30.0, float(val_Brightness.get()), float(val_Gain.get()), float(val_Exposure.get())]
         p = pathCamera + 'currentProperty.txt'
         with open(p, 'w') as f:
             f.write(" ".join(str(item) for item in property_result))
-        #var_test.set(property_result)
+        # var_test.set(property_result) # test code
         global propertyFile
         propertyFile = 'currentProperty.txt'
-        cap.release()
+        # cap.release()
         window_property.destroy()
 
     def button_cancel_setting():
-        # cam = FindCamera(cameraName)
-        # SetCamera(cam, pathCamera, propertyFile)
-        # cam.StopLive()
+        # cap.release()
         window_property.destroy()
 
     start_Y += (rowGap * 4)
@@ -246,38 +394,31 @@ def createWindowForDeviceProperty():
     button_cancel = tk.Button(window_property, text='Cancel', font=('Arial', fontSize_label - 5),
                               command=button_cancel_setting)
     button_cancel.place(x=thirdCol_X - midGap, y=start_Y, width=eleWidth_label * 0.5, height=eleHeight_label)
+    window_property.mainloop()
 
 
 # #################################################################################################################
 
 
-# set up the contents in window ##############################
+# set up the contents in window.
 def setUpContents(path_fileName, path_Capture, path_Process, path_Camera, camera_name):
-    # height = 576
-    # width = 768
+    # locate the position of each element and the gap between them ############################
     midGap = 40  # col gap
-    print(windowHeight)
-    print(windowWidth)
-
     window.title('Volume Calculating')
     window.geometry('%sx%s' % (windowWidth, windowHeight))
-
     eleWidth_label = windowWidth / 4 - (midGap * 0.75)  # element's width
     eleHeight_label = windowHeight / 20  # element's height
     start_X = midGap / 2  # the left border
     start_Y = eleHeight_label  # the top border
-
     eleWidth_text = eleWidth_label * 2 + midGap / 2  # "TEXT" width
     eleHeight_text = int(eleHeight_label * 8)  # "TEXT" height
-
     secondCol_X = start_X + eleWidth_label + midGap / 2  # the second col
     thirdCol_X = windowWidth / 2 + midGap / 2  # the third col
-
     rowGap = eleHeight_label + 15  # the gap between row
 
     # #################  create elements per row ##############################################
 
-    # ###### "user name" #####
+    # ###### "user name" ###########
     tk.Label(window, text='User Name: ', font=('Arial', fontSize_label)).place(x=start_X, y=start_Y)
     var_usr_name = tk.StringVar()
     var_usr_name.set(' ')
@@ -332,10 +473,11 @@ def setUpContents(path_fileName, path_Capture, path_Process, path_Camera, camera
 
         def write(self, info):  # The info is the output info received by the standard output sys.stdout and sys.stderr.
             # Insert a print message in the last line of the text.
-            if info[0] is "[":
-                text_running.insert('end', ".")
-            else:
-                text_running.insert('end', info)
+            if info is not None:
+                if info[0] is "[":
+                    text_running.insert('end', ".")
+                else:
+                    text_running.insert('end', info)
 
             # Update the text, otherwise, the inserted information cannot be displayed.
             text_running.update()
@@ -360,11 +502,13 @@ def setUpContents(path_fileName, path_Capture, path_Process, path_Camera, camera
 
     # ###### function for button "run" in the UI ######
     def running():
-        # cam = FindCamera('DFK 37BUX287 15910406')
+
+        # set up camera
         cam = FindCamera(camera_name)
-        SetCamera(cam, path_Camera, propertyFile)
+        SetCamera(cam, path_Camera, propertyFile, 'manual')
         cam.StopLive()
 
+        # read saving result file
         rowCount, wb = ReadFromResult(path_fileName)
         sheet1 = wb.get_sheet(0)
 
@@ -428,7 +572,7 @@ def setUpContents(path_fileName, path_Capture, path_Process, path_Camera, camera
     button_exit = tk.Button(window, text='Exit', font=('Arial', fontSize_label), command=window.quit)
     button_exit.place(x=secondCol_X + eleWidth_label / 4, y=start_Y, width=eleWidth_label / 2, height=eleHeight_label)
 
-    ################
+    # ###############
     window.mainloop()
     mystd.restoreStd()  # Restore standard output.
 
@@ -503,13 +647,13 @@ def singleTest(name, dic_pro, dic_cap, imageOrFrame, show3D, save, excel_path, e
 def createUI(path_fileName, path_Capture, path_Process, path_Camera, camera_Name):
     # set up camera
     # when press "run" without any setting up cam, the cam uses the default configure.
-    # cam = FindCamera(camera_Name)
-    # SetCamera(cam, path_Camera, propertyFile)
-    # cam.StopLive()
-
-    global pathCamera, cameraName
+    global pathCamera, cameraName, camera_auto_Exposure, camera_manual_Exposure
     pathCamera = path_Camera
     cameraName = camera_Name
+
+    cam = FindCamera(camera_Name)
+    camera_auto_Exposure, camera_manual_Exposure = SetCamera(cam, path_Camera, propertyFile, 'auto')
+    cam.StopLive()
 
     # create UI
     setUpMenuBar(path_Camera, camera_Name)
