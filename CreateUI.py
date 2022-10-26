@@ -22,17 +22,19 @@ propertyFile = 'default.txt'  # the file with the camera default setting.
 pathCamera = ' '
 cameraName = ' '
 camera_auto_Exposure = 0
-camera_manual_Exposure = 0
+# camera_manual_Exposure = 0
 
 # parameters about the carving algorithm #########
 pixPerMMAtZ = 129 / 6.63  # 80 / 3.94  # new device
+
 # the middle of height of original image, to ensure the bottom of seed is on this line level when cropping.
 middle_original = 240
+
 imageWidth = 200  # the roi image's size
 imageHeight = 200  # the roi image's size
-vintForWheat = 90
+vintForWheat = 100
 vintForMilo = 50
-vintForOther = 70
+vintForOther = 120
 # ################################################
 
 # define the window (UI) #########################
@@ -62,7 +64,7 @@ def ReadFromResult(file):
 
 
 # #################  create menu bar #########################################################
-def setUpMenuBar(path_Camera, camera_name):
+def setUpMenuBar():
     menuBar = tk.Menu(window)
 
     # ### 1. create File menu ############################
@@ -74,7 +76,7 @@ def setUpMenuBar(path_Camera, camera_name):
     def wheatSetting():
         global propertyFile
         propertyFile = 'default_wheat.txt'
-        messagebox.showinfo("showinfo", "Set the light level to 1 or 2! If you use default property of CAM.")
+        messagebox.showinfo("showinfo", "Set the light level to 1! If you use default property of CAM.")
 
     # the function for "milo"
     def miloSetting():
@@ -236,11 +238,20 @@ def createWindowForDeviceProperty():
     def spinBox_Exposure_function():  # no input parameter.
         v = val_Exposure.get()
         if float(v) == 0:
-            v = 1 / (math.pow(2, 13))
-        temp = round(math.log2(1 / float(v)), 2)
-        #var_test.set(temp)  # test code
-        #cap.set(cv2.CAP_PROP_EXPOSURE, -temp)
+             v = 0.00001
+
+        # set up camera
+        cam = FindCamera()
+        SetCamera_Exposure(cam, float(v), 'manual')
+        cam.StopLive()
+
+        # show image
         display_currentImage()
+
+        # # re-setup back to default auto after display the image.
+        # cam = FindCamera()
+        # SetCamera_Exposure(cam, float(camera_auto_Exposure), 'manual')
+        # cam.StopLive()
 
     spinBox_Exposure = tk.Spinbox(window_property, from_=0, to=0.5, font=('Arial', 14), increment=0.0005,
                                   textvariable=val_Exposure, command=spinBox_Exposure_function)
@@ -257,42 +268,41 @@ def createWindowForDeviceProperty():
 
 
     #################################//////////////////////////////////////////////////////
-    cap = cv2.VideoCapture(1)
+    #cap = cv2.VideoCapture(1)
 
     # for checkButton exposure
     val_Exposure_Check = tk.IntVar()
     var_test.set(camera_auto_Exposure)
-    if float(camera_auto_Exposure) == 0:
-        v = 1 / (math.pow(2, 13))
-    temp = round(math.log2(1 / float(camera_auto_Exposure)), 2)
-
+    # if float(camera_auto_Exposure) == 0:
+    #     v = 1 / (math.pow(2, 13))
+    # temp = round(math.log2(1 / float(camera_auto_Exposure)), 2)
+    #
     # var_test.set(-temp)  # test code
     #cap.set(cv2.CAP_PROP_EXPOSURE, -temp)
 
 
     def checkButton_Exposure_function():
 
-        cam = FindCamera(cameraName)
+        cam = FindCamera()
         if val_Exposure_Check.get() == 1:
-            # if float(camera_auto_Exposure) == 0:
-            #     temp = 1 / (math.pow(2, 13))
-            # else:
-            #     temp = round(math.log2(1 / float(camera_auto_Exposure)), 2)
-            # var_test.set(-temp)  # test code
-            SetCamera_Exposure(cam, " ", 'auto')
+            var_test.set("auto" + str(camera_auto_Exposure))  # test code
             spinBox_Exposure.config(state='disabled')
+            SetCamera_Exposure(cam, " ", 'auto')
         else:
             if float(val_Exposure.get()) == 0:
                 temp = 1 / (math.pow(2, 13))
             else:
                 temp = float(val_Exposure.get())
-            var_test.set(-temp)  # test code
-            SetCamera_Exposure(cam, temp, 'manual')
+            var_test.set("unauto" + str(camera_auto_Exposure))  # test code
             spinBox_Exposure.config(state='normal')
- 
+            SetCamera_Exposure(cam, temp, 'manual')
         cam.StopLive()
-
         display_currentImage()
+
+        # re-setup back to default auto.
+        cam = FindCamera()
+        SetCamera_Exposure(cam, float(camera_auto_Exposure), 'manual')
+        cam.StopLive()
         # print("dd")
 
     # #################################////////////////////////////////////////////////////////
@@ -335,14 +345,12 @@ def createWindowForDeviceProperty():
 
     display_currentImage()
     ####################################################################
-    # function for video streaming, that is,  real time video.
+    # function for video streaming, that is, real time video. Consumes a lot of memory and the operation is insensitive.
     # def setUpExposure():
     #     v = val_Exposure.get()
     #     if float(v) == 0:
     #         v = 1 / (math.pow(2, 13))
-    #     temp = round(math.log2(1 / float(v)), 2)
-    #     # var_test.set(temp)  # test code
-    #     cap.set(cv2.CAP_PROP_EXPOSURE, -temp)
+    #
     #
     # def setUpBrightness():
     #     v = val_brightness.get()
@@ -401,7 +409,7 @@ def createWindowForDeviceProperty():
 
 
 # set up the contents in window.
-def setUpContents(path_fileName, path_Capture, path_Process, path_Camera, camera_name):
+def setUpContents(path_fileName, path_Capture, path_Process):
     # locate the position of each element and the gap between them ############################
     midGap = 40  # col gap
     window.title('Volume Calculating')
@@ -414,7 +422,7 @@ def setUpContents(path_fileName, path_Capture, path_Process, path_Camera, camera
     eleHeight_text = int(eleHeight_label * 8)  # "TEXT" height
     secondCol_X = start_X + eleWidth_label + midGap / 2  # the second col
     thirdCol_X = windowWidth / 2 + midGap / 2  # the third col
-    rowGap = eleHeight_label + 15  # the gap between row
+    rowGap = eleHeight_label + 13  # the gap between row
 
     # #################  create elements per row ##############################################
 
@@ -447,6 +455,14 @@ def setUpContents(path_fileName, path_Capture, path_Process, path_Camera, camera
     entry_seed_id = tk.Entry(window, textvariable=var_seed_id, font=('Arial', fontSize_label))
     entry_seed_id.place(x=secondCol_X, y=start_Y, width=eleWidth_label)
 
+    # ###### "light level" ########
+    start_Y += rowGap
+    tk.Label(window, text='LED Level: ', font=('Arial', fontSize_label)).place(x=start_X, y=start_Y)
+    list_light_level = ["level 1", "level 2", "level 3", "level 4"]
+    box_light_level = ttk.Combobox(window, values=list_light_level, state="readonly",
+                                     font=('Arial', fontSize_label))
+    box_light_level.place(x=secondCol_X, y=start_Y, height=35, width=eleWidth_label)
+
     # ###### "whether show 3d model" ##############
     start_Y += rowGap
     var_show_model = tk.IntVar()
@@ -455,7 +471,7 @@ def setUpContents(path_fileName, path_Capture, path_Process, path_Camera, camera
     button_show_model.place(x=start_X, y=start_Y)
 
     # ###### running text ############
-    start_Y += (rowGap * 2 + 20)
+    start_Y += (rowGap * 2)
     text_running = tk.Text(window, font=('Arial', 10))
     text_running.configure(state='disabled')
     text_running.place(x=start_X, y=start_Y, width=eleWidth_text, height=eleHeight_text)
@@ -498,15 +514,16 @@ def setUpContents(path_fileName, path_Capture, path_Process, path_Camera, camera
     text_display.place(x=thirdCol_X, y=start_Y, width=eleWidth_text, height=eleHeight_text)
 
     # ###### button: "run" and "exit" ################
-    start_Y -= (rowGap + 10)
+    start_Y -= rowGap
 
     # ###### function for button "run" in the UI ######
     def running():
 
         # set up camera
-        cam = FindCamera(camera_name)
-        SetCamera(cam, path_Camera, propertyFile, 'manual')
-        cam.StopLive()
+        # cam = FindCamera(camera_name)
+        # SetCamera(cam, path_Camera, propertyFile, 'manual')
+        #
+        # cam.StopLive()
 
         # read saving result file
         rowCount, wb = ReadFromResult(path_fileName)
@@ -583,8 +600,8 @@ def setUpContents(path_fileName, path_Capture, path_Process, path_Camera, camera
 # check whether two images are the same or not, to test whether the object moved during the capturing process or not.
 def isSame(dic, num1, num2):
     try:
-        X_1, Y_1, width_1, height_1 = GetArea(dic, 70, num1, "original", middle_original, imageHeight)
-        X_2, Y_2, width_2, height_2 = GetArea(dic, 70, num2, "original", middle_original, imageHeight)
+        X_1, Y_1, width_1, height_1 = GetArea(dic, 170, num1, "original", middle_original, imageHeight)
+        X_2, Y_2, width_2, height_2 = GetArea(dic, 170, num2, "original", middle_original, imageHeight)
         print(X_1, Y_1, width_1, height_1)
         print(X_2, Y_2, width_2, height_2)
         if abs(X_1 - X_2 > 1) or abs(Y_1 - Y_2 > 1) or abs(width_1 - width_2 > 1) or abs(height_1 - height_2 > 1):
@@ -644,17 +661,18 @@ def singleTest(name, dic_pro, dic_cap, imageOrFrame, show3D, save, excel_path, e
 
 
 # set up the window
-def createUI(path_fileName, path_Capture, path_Process, path_Camera, camera_Name):
+def createUI(path_fileName, path_Capture, path_Process, path_Camera):
     # set up camera
     # when press "run" without any setting up cam, the cam uses the default configure.
-    global pathCamera, cameraName, camera_auto_Exposure, camera_manual_Exposure
+    global pathCamera, propertyFile
     pathCamera = path_Camera
-    cameraName = camera_Name
 
-    cam = FindCamera(camera_Name)
+    # before the UI works, find and store the default auto exposure value.
+    global camera_auto_Exposure  # , camera_manual_Exposure
+    cam = FindCamera()
     camera_auto_Exposure, camera_manual_Exposure = SetCamera(cam, path_Camera, propertyFile, 'auto')
     cam.StopLive()
 
     # create UI
-    setUpMenuBar(path_Camera, camera_Name)
-    setUpContents(path_fileName, path_Capture, path_Process, path_Camera, camera_Name)
+    setUpMenuBar()
+    setUpContents(path_fileName, path_Capture, path_Process)

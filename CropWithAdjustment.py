@@ -11,11 +11,11 @@ def GetArea(dic, vintValue, imageNum, imageType, middle_original, imageHeight):
         imgname = dic + 'ROI_0{:02d}0.png'.format(imageNum - 1)
 
     img = cv2.imread(imgname)  # input image, used to get the height of the target
-    if dic[-2] == 'd':  # captured folder
-        img_new = img[0:middle_original-10, :]  # input image, used to get the width and length of the target
+    if dic[-1] == 'd':  # captured folder
+        img_new = img[0:middle_original - 10, :]  # input image, used to get the width and length of the target
     else:
         if imageType == "original":
-            img_new = img[0:middle_original-10, :]
+            img_new = img[0:middle_original - 10, :]
         else:
             img_new = img
 
@@ -91,7 +91,7 @@ def normalizeImage(dic, vintValue, imageNum, expectedWidth, imageWidth, imageHei
     center = (round(X + width / 2), round(Y + height / 2))
     color = (0, 0, 0)
     thickness = 10
-    img = cv2.circle(img, center, round(max(width / 2 + 10, height/2 + 10)), color, thickness)
+    img = cv2.circle(img, center, round(max(width / 2 + 10, height / 2 + 10)), color, thickness)
     ####
 
     firstCrop = img[Y: Y + height, X: X + width]  # get the target
@@ -110,7 +110,7 @@ def normalizeImage(dic, vintValue, imageNum, expectedWidth, imageWidth, imageHei
 
     # make the new target in the bottom center of the result image
     try:
-        if bottomY == 0:    # the 1st image.
+        if bottomY == 0:  # the 1st image.
             result[start_Y: start_Y + newH, start_X: start_X + newW] = resized
         else:
             result[bottomY - newH: bottomY, start_X: start_X + newW] = resized
@@ -132,4 +132,103 @@ def CropWithAdjustment(dic, vintValue, imageWidth, imageHeight, expectedWidth, m
         normalizeImage(dic, vintValue, imgNum, expectedWidth[imgNum - 1], imageWidth, imageHeight, bottomY,
                        middle_original)
         imgNum += 1
+
+
+# test new idea
+##############################################################################################
+def PreAdjustment(path, vintValue):
+    imgNum = 1
+    while imgNum < 37:
+        print(imgNum)
+        imgName = path + ("%04d" % imgNum) + '.bmp'
+        img = cv2.imread(imgName)
+
+        image = cv2.GaussianBlur(img, (3, 3), 0)
+        edges = cv2.Canny(image, 0, 30)  # using low vint value.
+        edges = cv2.cvtColor(edges, cv2.COLOR_GRAY2BGR)
+
+        # modify the edges image to remove the bottom noisy.
+        gap = 20
+        coverLineVal = modifyEdges(edges, gap)
+        width = img.shape[1]
+        height = img.shape[0]
+        coverImage = np.zeros((coverLineVal, width, 3))
+        edges[height - coverLineVal:height, :] = coverImage
+
+        # combine the edges image and original image
+        new_image = cv2.add(edges, img)
+        cv2.imwrite(path + ("%04d" % imgNum) + '.bmp', new_image)
+
+        # draw the black circle edge around the target.
+        X, Y, width, height = GetArea(path, vintValue, imgNum, "original")
+        center = (round(X + width / 2), round(Y + height / 2))
+        color = (0, 0, 0)
+        thickness = 5
+        new_image = cv2.circle(new_image, center, round(max(width / 2 + 5, height / 2 + 5)), color, thickness)
+
+        cv2.imwrite(path + ("%04d" % imgNum) + '.bmp', new_image)
+
+        imgNum += 1
+
+
+# remove the bottom noisy
+def modifyEdges(edges, gap):
+
+    height, width, _ = edges.shape
+    temp = edges[height-gap:height, :]
+
+    # get all point with color
+    res = []
+    for row in range(0, gap):
+        for col in range(0, width):
+            if temp[row][col][0] == 255:
+                res.append((col, row))
+    res = sorted(res)
+
+    # keep the points existed in the same col, and separate them in groups.
+    # such as [28, [0, 18]], where 28 is col, 0 and 18 is row.
+    newRes = []
+    pre = -1
+    for i in range(0, len(res) - 1):
+        if res[i][0] == pre:
+            newRes.append(res[i])
+        else:
+            if res[i][0] == res[i + 1][0]:
+                newRes.append(res[i])
+            pre = res[i][0]
+    all_values = [list[0] for list in newRes]
+    unique_values = sorted(set(all_values))
+
+    result = []
+    for value in unique_values:
+        this_group = []
+        for list in newRes:
+            if list[0] == value:
+                this_group.append(list[1])
+        result.append((value, this_group))
+
+    # select the first 10 groups in the left side and right side respectively.
+    leftPart = result[:10]
+    rightPart = result[len(result) - 10:]
+
+    # get the noisy level
+    minValue = gap
+    for item in leftPart:
+        if isValid(item[1], gap):
+            for ele in item[1]:
+                if 15 <= ele <= minValue:
+                    minValue = ele
+    for item in rightPart:
+        if isValid(item[1], gap):
+            for ele in item[1]:
+                if 15 <= ele <= minValue:
+                    minValue = ele
+    return gap - minValue
+
+
+def isValid(list, gap):
+    if list[0] < int(gap * 0.75) <= list[len(list) - 1]:
+        return True
+    else:
+        return False
 

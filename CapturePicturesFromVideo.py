@@ -13,10 +13,10 @@ def getImagesFromVideo(dic, middle_original):
     videoCapture = cv2.VideoCapture(1)
 
     # set up the motor: speed/frame. # 32/5 ; 39.5/4 ; 52.6/3 ; 79/2(best).
-    turnDegrees = 540
+    turnDegrees = 555
     # turn = 'G21G91G1X{}F79'.format((turnDegrees * 0.08884) / 10)    # old device # 0.08884 corresponds to 10 degrees.
     # connection = serial.Serial('COM7', 115200)  # old device
-    turn = 'G21G91G1X{}F79'.format((turnDegrees * 0.17768) / 10)
+    turn = 'G21G91G1X{}F79'.format((turnDegrees * 0.17768) / 10) # new device
     connection = serial.Serial('COM6', 115200)  # new device
 
     time.sleep(2)  # Wait for grbl to initialize
@@ -31,8 +31,8 @@ def getImagesFromVideo(dic, middle_original):
     j = 1
     while videoCapture.isOpened():
         success, frame = videoCapture.read()
-        timeF = 4  # old 2; new 4
-        if i > timeF * 9 and i % timeF == 0:
+        timeF = 4  # based on the frame rate in the camera configure.  old 2; new 4
+        if i > timeF * 4 and i % timeF == 0:
             if j < 38:
                 cv2.imwrite(dic + "/00{:02d}.bmp".format(j), frame)
                 image = cv2.imread(dic + "/00{:02d}.bmp".format(j))

@@ -24,7 +24,7 @@ def HSVSegmentSeq(fnin, fnout, Hint, Sint, Vint):
         # save image(mask)
         WriteImage(mask, fnout, i)
 
-        # pre deal with mask
+        # improve the mask image.
         dealWithMaskImage(i, Vint, fnout)
 
 

@@ -33,18 +33,21 @@ root_path = app_path() + '/'
 print(root_path)
 path_Capture = root_path + 'pic_Captured/'  # save the captured images
 path_Process = root_path + 'pic_processing/'  # save the processing images
-path_Camera = root_path + 'CameraProperty/'  # save the processing images
+path_Camera = root_path + 'CameraProperty/'  # save the camera setting.
 path_fileName = root_path + 'result.xls'  # read an excel file, prepare to store the result into it.
+
 if not os.path.exists(path_Capture):
     os.mkdir(path_Capture)
 if not os.path.exists(path_Process):
     os.mkdir(path_Process)
+if not os.path.exists(path_Camera):
+    os.mkdir(path_Camera)
 if not os.path.exists(path_fileName):
     CreateNewResult()
 # ##################################################
 
 
 if __name__ == '__main__':
-
     # run the UI
+    # camera_name = 'DFK 37BUX287 15910406'
     createUI(path_fileName, path_Capture, path_Process, path_Camera)

@@ -2,6 +2,7 @@ from HSVSegmentSeq import HSVSegmentSeq
 from TurntableCarve import TurntableCarve
 from CropWithAdjustment import CropWithAdjustment
 from CropWithAdjustment import getExpectedValues
+from CropWithAdjustment import PreAdjustment
 from datetime import datetime
 
 import subprocess
@@ -25,6 +26,9 @@ class Object(object):
 def CalculateVolume(name, dic, vintValue, pixPerMMAtZ, imageWidth, imageHeight, show3D, stored, excel_path, wb, sheet,
                     rowCount, middle_original):
     print("** Process --- Analyze images **")
+
+    # pre deal with image (optional)
+    # PreAdjustment(dic, vintValue)
 
     # get the width of target in each image ##############
     allWidthData, allHeightData = getExpectedValues(dic, vintValue, "original", middle_original, imageHeight)
@@ -52,7 +56,7 @@ def CalculateVolume(name, dic, vintValue, pixPerMMAtZ, imageWidth, imageHeight, 
     # color interval of foreground object in HSV space
     Hint = [0, 255]
     Sint = [0, 255]
-    Vint = [vintValue, 255]  # 75
+    Vint = [vintValue, 255]
 
     # segment seed using its HSV color value, that is generate the mask images.
     HSVSegmentSeq(fnroi, fnmask, Hint, Sint, Vint)

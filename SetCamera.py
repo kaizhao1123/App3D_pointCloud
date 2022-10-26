@@ -1,17 +1,20 @@
 # come from https://github.com/elerac/IC-Imaging-Control
+import time
+
 import tisgrabber as IC
 
 
-def FindCamera(camModel):
+def FindCamera():
     # Create the camera object.
     Camera = IC.TIS_CAM()
-    # Open a device with hard coded unique name:
-    Camera.open(camModel)
 
-    # ic_ic = IC.IC_ImagingControl()
-    # ic_ic.init_library()
-    # cam_names = ic_ic.get_unique_device_names()
-    # cam = ic_ic.get_device(cam_names[0])
+    # List available devices as unique names. This is a combination of camera name and serial number.
+    Devices = Camera.GetDevices()
+    for i in range(len(Devices)):
+        print(str(i) + " : " + str(Devices[i]))
+
+    # Open a device with hard coded unique name:
+    Camera.open(Devices[0].decode("utf-8"))
 
     return Camera
 
@@ -36,7 +39,7 @@ def SetCamera(camera, path_Camera, propertyFile, auto):
             exposure_value = 0.0
         else:
             exposure_value = float(exposure_value)
-    print(exposure_value)
+    #print(exposure_value)
 
     # set up camera.
     if camera.IsDevValid() == 1:
@@ -46,70 +49,28 @@ def SetCamera(camera, path_Camera, propertyFile, auto):
         # # Start the live video stream, but show no own live video window. We will use OpenCV for this.
         camera.StartLive(1)
 
-        # ## Set some properties  ##############
-        # Exposure time
-        # ExposureAuto = [1]
-        # print("Exposure auto 1: ", ExposureAuto[0])
-        # #camera.GetPropertySwitch("Exposure", "Auto", ExposureAuto)
-        # print("Exposure auto 2: ", ExposureAuto[0])
-        #
-        # # In order to set a fixed exposure time, the Exposure Automatic must be disabled first.
-        # # Using the IC Imaging Control VCD Property Inspector, we know, the item is "Exposure", the
-        # # element is "Auto" and the interface is "Switch". Therefore we use for disabling:
-        # camera.SetPropertySwitch("Exposure", "Auto", 1)
-        # # camera.GetPropertySwitch("Exposure", "Auto", ExposureAuto)
-        # print("Exposure auto 3: ", ExposureAuto[0])
-        # # "0" is off(set auto off), "1" is on.
-        #
-        # ExposureTime = [0]
-        # camera.GetPropertyAbsoluteValue("Exposure", "Value", ExposureTime)
-        # camera.SetPropertySwitch("Exposure", "Auto", 1)
-        # print("Exposure auto 4: ", ExposureAuto[0])
-        # print("Exposure time abs (before): ", ExposureTime[0])
-        # auto_exposure = ExposureTime[0]
-        # # Set an absolute exposure time, given in fractions of seconds. 0.0303 is 1/30 second:
-        # # if auto is not 'auto':
-        # #camera.SetPropertyAbsoluteValue("Exposure", "Value", exposure_value)
-        # print("Exposure time abs (after): ", ExposureTime[0])
-        #
-        #
-        # # camera.GetPropertyAbsoluteValue("Exposure", "Value", ExposureTime)
-        # print("Exposure time abs (reset): ", ExposureTime[0])
+        # camera.enableVideoAutoProperty(9, 0)    # change gain auto to off(0), on(1).
 
+        # about exposure.
+        ExposureTime = [0]  # track the exposure time.
+        camera.GetPropertyAbsoluteValue("Exposure", "Value", ExposureTime)
+        auto_exposure_time = ExposureTime[0]
 
+        if auto is 'auto':
+            camera.enableCameraAutoProperty(4, 1)  # change exposure auto to off(0), on(1).
+            print("Exposure auto : ", 1)
+            print("Exposure time (auto) : ", auto_exposure_time)
+        else:
+            camera.enableCameraAutoProperty(4, 0)
+            # Set an absolute exposure time, given in fractions of seconds. 0.0303 is 1/30 second:
+            camera.SetPropertyAbsoluteValue("Exposure", "Value", ExposureTime[0]/2)     # manual exposure time.
+            camera.GetPropertyAbsoluteValue("Exposure", "Value", ExposureTime)
+            print("Exposure auto : ", 0)
+            print("Exposure time (manual): ", ExposureTime[0])
 
-        # ##########///////////////////////////////////////////////
-        # ExposureAuto = [1]
-        # print("Exposure auto 1: ", ExposureAuto[0])
-        # ExposureTime = [0]
-        # camera.GetPropertyAbsoluteValue("Exposure", "Value", ExposureTime)
-        # print("Exposure time abs (before): ", ExposureTime[0])
-        # auto_exposure = ExposureTime[0]
-        # if auto is not 'auto':
-        #     camera.SetPropertySwitch("Exposure", "Auto", 1)
-        #     camera.SetPropertySwitch("Exposure", "Auto", 0)
-        #     print("Exposure auto_manu: ", ExposureAuto[0])
-        #     camera.SetPropertyAbsoluteValue("Exposure", "Value", exposure_value)
-        #     camera.GetPropertyAbsoluteValue("Exposure", "Value", ExposureTime)
-        #     print("Exposure time abs (after): ", ExposureTime[0])
-        # else:
-        #     camera.SetPropertySwitch("Exposure", "Auto", 0)
-        #     camera.SetPropertySwitch("Exposure", "Auto", 1)
-        #     print("Exposure auto_auto: ", ExposureAuto[0])
-        #     camera.GetPropertyAbsoluteValue("Exposure", "Value", ExposureTime)
-        #     print("Exposure time abs (after_auto): ", ExposureTime[0])
+        current_exposure_time = ExposureTime[0]
 
-        auto_exposure = SetCamera_Exposure(camera, exposure_value, auto)
-
-
-
-
-
-
-
-
-        # ##########///////////////////////////////////////////////
-
+        # auto_exposure = SetCamera_Exposure(camera, exposure_value, auto)
 
         # # Proceed with Gain, since we have gain automatic, disable first. Then set values.
         Gainauto = [0]
@@ -129,7 +90,7 @@ def SetCamera(camera, path_Camera, propertyFile, auto):
         camera.SetPropertyValue("WhiteBalance", "Value", brightness_value)
         print("WB auto : ", WhiteBalanceAuto[0])
 
-        return auto_exposure, exposure_value
+        return auto_exposure_time, current_exposure_time
 
     else:
         print("No device selected")
@@ -143,16 +104,19 @@ def SetCamera_Exposure(camera, exposure_value, auto):
     print("Exposure time abs (before): ", ExposureTime[0])
     auto_exposure = ExposureTime[0]
     if auto is not 'auto':
-        camera.SetPropertySwitch("Exposure", "Auto", 1)
-        camera.SetPropertySwitch("Exposure", "Auto", 0)
+        # camera.SetPropertySwitch("Exposure", "Auto", 1)
+        #camera.SetPropertySwitch("Exposure", "Auto", 0)
         print("Exposure auto_manu: ", ExposureAuto[0])
         camera.SetPropertyAbsoluteValue("Exposure", "Value", exposure_value)
-        camera.GetPropertyAbsoluteValue("Exposure", "Value", ExposureTime)
+        #camera.GetPropertyAbsoluteValue("Exposure", "Value", ExposureTime)
         print("Exposure time abs (after): ", ExposureTime[0])
     else:
-        camera.SetPropertySwitch("Exposure", "Auto", 0)
-        camera.SetPropertySwitch("Exposure", "Auto", 1)
+        #camera.SetPropertySwitch("Exposure", "Auto", 0)
+        # camera.SetPropertySwitch("Exposure", "Auto", 1)
+        time.sleep(2)   # give time to camera to re-auto.
         print("Exposure auto_auto: ", ExposureAuto[0])
         camera.GetPropertyAbsoluteValue("Exposure", "Value", ExposureTime)
         print("Exposure time abs (after_auto): ", ExposureTime[0])
+        auto_exposure = ExposureTime[0]
+
     return auto_exposure
