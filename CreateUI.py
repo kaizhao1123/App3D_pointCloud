@@ -20,9 +20,11 @@ stored = True  # whether store the results into the excel file
 captureSrc = 'video'
 propertyFile = 'default.txt'  # the file with the camera default setting.
 pathCamera = ' '
-cameraName = ' '
+camera_status_auto = True
 camera_auto_Exposure = 0
 # camera_manual_Exposure = 0
+motor_speed = 79  # the  default turning value of Motor.
+
 
 # parameters about the carving algorithm #########
 pixPerMMAtZ = 129 / 6.63  # 80 / 3.94  # new device
@@ -63,6 +65,64 @@ def ReadFromResult(file):
     return rowCount, wb
 
 
+# the function for menu bar: File - Load Setting - wheat.
+def wheatSetting():
+    global propertyFile
+    propertyFile = 'default_wheat.txt'
+    # messagebox.showinfo("showinfo", "Set the light level to 1! If you use default property of CAM.")
+    window.winfo_children()[4].current(0)  # "seed category"
+    window.winfo_children()[10].configure(values=["level 1"])
+    window.winfo_children()[10].current(0)  # "LED level"
+
+
+# the function for menu bar: File - Load Setting - milo.
+def miloSetting():
+    global propertyFile
+    propertyFile = 'default_milo.txt'
+    # messagebox.showinfo("showinfo", "Set the light level to 3! If you use default property of CAM.")
+    window.winfo_children()[4].current(1)  # "seed category"
+    window.winfo_children()[10].configure(values=["level 2"])
+    window.winfo_children()[10].current(0)  # "LED level"
+
+
+# the function for menu bar: File - Load Setting - other.
+def otherSetting():
+    global propertyFile
+    filetypes = (
+        ('text files', '*.txt'),
+        ('All files', '*.*')
+    )
+    propertyFile = fd.askopenfilename(
+        title='Open a file',
+        initialdir=pathCamera,
+        filetypes=filetypes)
+
+
+# the function for menu bar: File - save Setting.
+def saveSetting():
+    Files = [('All Files', '*.*'),
+             ('Text Document', '*.txt')]
+    f = fd.asksaveasfile(title='save a file', initialdir=pathCamera, filetypes=Files, defaultextension=Files)
+    if f is None:  # asksaveasfile return `None` if dialog closed with "cancel".
+        return
+
+    seedCat = window.winfo_children()[4].get()
+    if (seedCat != 'wheat' and seedCat != 'milo') or camera_status_auto is False:
+        property_result = [seedCat, 30.0, 'auto', 'auto', 'auto', motor_speed]
+        p = pathCamera + 'currentProperty.txt'
+        with open(p, 'w') as nf:
+            nf.write(" ".join(str(item) for item in property_result))
+        global propertyFile
+        propertyFile = 'currentProperty.txt'
+        nf.close()
+
+    with open(pathCamera + propertyFile) as ff:
+        # messagebox.showinfo("showinfo", "Set the light level to 3! If you use default property of CAM.")
+        contents = ff.read().split(" ")
+        f.write(" ".join(str(item) for item in contents))
+        f.close()
+
+
 # #################  create menu bar #########################################################
 def setUpMenuBar():
     menuBar = tk.Menu(window)
@@ -70,57 +130,11 @@ def setUpMenuBar():
     # ### 1. create File menu ############################
     fileMenu = tk.Menu(menuBar, tearoff=0)
     menuBar.add_cascade(label='File', menu=fileMenu)
-
-    # add elements into File menu ###############
-    # the function for "wheat"
-    def wheatSetting():
-        global propertyFile
-        propertyFile = 'default_wheat.txt'
-        messagebox.showinfo("showinfo", "Set the light level to 1! If you use default property of CAM.")
-
-    # the function for "milo"
-    def miloSetting():
-        global propertyFile
-        propertyFile = 'default_milo.txt'
-        messagebox.showinfo("showinfo", "Set the light level to 3! If you use default property of CAM.")
-
-    # the function for "other", to choose property file
-    def otherSetting():
-        global propertyFile
-        filetypes = (
-            ('text files', '*.txt'),
-            ('All files', '*.*')
-        )
-        propertyFile = fd.askopenfilename(
-            title='Open a file',
-            initialdir=pathCamera,
-            filetypes=filetypes)
-
-        # for test ******
-        # messagebox.showinfo(
-        #     title='Selected File',
-        #     message=propertyFile
-        # )
-
     loadMenu = tk.Menu(fileMenu)  # for load different file
     loadMenu.add_command(label='wheat', command=wheatSetting, font=font_menu)
     loadMenu.add_command(label='milo', command=miloSetting, font=font_menu)
     loadMenu.add_command(label='other', command=otherSetting, font=font_menu)
     fileMenu.add_cascade(label='Load Setting', menu=loadMenu, underline=0, font=font_menu)
-
-    # save current device configure into text file.
-    def saveSetting():
-        Files = [('All Files', '*.*'),
-                 ('Text Document', '*.txt')]
-        f = fd.asksaveasfile(title='save a file', initialdir=pathCamera, filetypes=Files, defaultextension=Files)
-        if f is None:  # asksaveasfile return `None` if dialog closed with "cancel".
-            return
-        global propertyFile
-        with open(pathCamera + propertyFile) as ff:
-            contents = ff.read().split(" ")
-            f.write(" ".join(str(item) for item in contents))
-            f.close()
-
     fileMenu.add_command(label='Save Setting', command=saveSetting, font=font_menu)
     fileMenu.add_separator()
     fileMenu.add_command(label='Exit', command=window.quit, font=font_menu)
@@ -128,7 +142,6 @@ def setUpMenuBar():
     # ### 2. create Device menu ############################
     deviceMenu = tk.Menu(menuBar, tearoff=0)
     menuBar.add_cascade(label='Device', menu=deviceMenu)
-
     # add elements into Device menu
     deviceMenu.add_command(label='Property', command=createWindowForDeviceProperty, font=font_menu)
 
@@ -161,9 +174,10 @@ def createWindowForDeviceProperty():
 
     # for scale Brightness
     def scale_Brightness_function(v):  # need the input parameter.
-        print("dd")
-        #cap.set(cv2.CAP_PROP_BRIGHTNESS, float(v))
-        #display_currentImage()
+        cap = cv2.VideoCapture(1)
+        cap.set(cv2.CAP_PROP_BRIGHTNESS, float(v))
+        display_currentImage()
+        cap.release()
 
     scale_Brightness = tk.Scale(window_property, orient=tk.HORIZONTAL, length=eleWidth_label, width=eleHeight_label,
                                 from_=0, to=4096, sliderlength=10, showvalue=False, resolution=1,
@@ -173,8 +187,10 @@ def createWindowForDeviceProperty():
     # for spinBox Brightness.
     def spinBox_Brightness_function():  # no input parameter.
         v = val_Brightness.get()
-        #cap.set(cv2.CAP_PROP_BRIGHTNESS, float(v))
-        # display_currentImage()
+        cap = cv2.VideoCapture(1)
+        cap.set(cv2.CAP_PROP_BRIGHTNESS, float(v))
+        display_currentImage()
+        cap.release()
 
     spinBox_Brightness = tk.Spinbox(window_property, from_=0, to=4096, font=('Arial', 14), increment=1,
                                     textvariable=val_Brightness, command=spinBox_Brightness_function)
@@ -187,9 +203,10 @@ def createWindowForDeviceProperty():
 
     # for scale gain.
     def scale_Gain_function(v):  # need the input parameter.
-        #cap.set(cv2.CAP_PROP_GAIN, float(v))
-        #display_currentImage()
-        print("dd")
+        cap = cv2.VideoCapture(1)
+        cap.set(cv2.CAP_PROP_GAIN, float(v))
+        display_currentImage()
+        cap.release()
 
     scale_Gain = tk.Scale(window_property, orient=tk.HORIZONTAL, length=eleWidth_label, width=eleHeight_label,
                           from_=0, to=48, sliderlength=10, showvalue=False, resolution=1, variable=val_Gain,
@@ -199,16 +216,18 @@ def createWindowForDeviceProperty():
     # for spinBox gain.
     def spinBox_Gain_function():  # no input parameter.
         v = val_Gain.get()
-        #cap.set(cv2.CAP_PROP_GAIN, float(v))
-        #display_currentImage()
+        cap = cv2.VideoCapture(1)
+        cap.set(cv2.CAP_PROP_GAIN, float(v))
+        display_currentImage()
+        cap.release()
 
     spinBox_Gain = tk.Spinbox(window_property, from_=0, to=48, font=('Arial', 14), increment=1, textvariable=val_Gain,
                               command=spinBox_Gain_function)
     spinBox_Gain.place(x=thirdCol_X, y=start_Y + 3, width=eleWidth_label * 0.5)
 
     # for checkButton gain
-    checkButton_Gain = tk.Checkbutton(window_property, text='Auto', font=('Arial', 12))
-    checkButton_Gain.place(x=fourthCol_X, y=start_Y + 3, width=eleWidth_label * 0.5, height=eleHeight_label)
+    # checkButton_Gain = tk.Checkbutton(window_property, text='Auto', font=('Arial', 12))
+    # checkButton_Gain.place(x=fourthCol_X, y=start_Y + 3, width=eleWidth_label * 0.5, height=eleHeight_label)
 
     # ###### "Exposure" #####                   #? the value is the fixed increase, not dynamic increase. ?#
     start_Y += rowGap
@@ -223,10 +242,14 @@ def createWindowForDeviceProperty():
     # for scale exposure.
     def scale_Exposure_function(v):  # need the input parameter.
         if float(v) == 0:
-            v = 1 / (math.pow(2, 13))
-        temp = round(math.log2(1 / float(v)), 2)
-        # var_test.set(temp)  # test code
-        #cap.set(cv2.CAP_PROP_EXPOSURE, -temp)
+            v = 0.00001
+        #
+        # # set up camera
+        # cam = FindCamera()
+        # SetCamera_Exposure(cam, float(v), False)
+        # cam.StopLive()
+        #
+        # # show image
         # display_currentImage()
 
     scale_Exposure = tk.Scale(window_property, orient=tk.HORIZONTAL, length=eleWidth_label, width=eleHeight_label,
@@ -238,74 +261,52 @@ def createWindowForDeviceProperty():
     def spinBox_Exposure_function():  # no input parameter.
         v = val_Exposure.get()
         if float(v) == 0:
-             v = 0.00001
-
+            v = 0.00001
         # set up camera
         cam = FindCamera()
-        SetCamera_Exposure(cam, float(v), 'manual')
+        SetCamera_Exposure(cam, float(v), False)
         cam.StopLive()
-
         # show image
         display_currentImage()
-
-        # # re-setup back to default auto after display the image.
-        # cam = FindCamera()
-        # SetCamera_Exposure(cam, float(camera_auto_Exposure), 'manual')
-        # cam.StopLive()
 
     spinBox_Exposure = tk.Spinbox(window_property, from_=0, to=0.5, font=('Arial', 14), increment=0.0005,
                                   textvariable=val_Exposure, command=spinBox_Exposure_function)
     spinBox_Exposure.place(x=thirdCol_X, y=start_Y + 3, width=eleWidth_label * 0.5 + 20)
 
-
+    ########################################################################################
     # #### test to get the exposure value. ####  # test code(for debug)
     var_test = tk.StringVar()
     label_test = tk.Label(window_property, textvariable=var_test, bg='green', fg='white', font=('Arial', 12),
                           width=230, height=2)
     label_test.place(x=100, y=200, width=200, height=30)
 
+    ########################################################################################
 
-
-
-    #################################//////////////////////////////////////////////////////
-    #cap = cv2.VideoCapture(1)
-
-    # for checkButton exposure
+    # for auto checkButton of exposure
     val_Exposure_Check = tk.IntVar()
     var_test.set(camera_auto_Exposure)
-    # if float(camera_auto_Exposure) == 0:
-    #     v = 1 / (math.pow(2, 13))
-    # temp = round(math.log2(1 / float(camera_auto_Exposure)), 2)
-    #
-    # var_test.set(-temp)  # test code
-    #cap.set(cv2.CAP_PROP_EXPOSURE, -temp)
-
 
     def checkButton_Exposure_function():
+        global camera_status_auto
 
         cam = FindCamera()
         if val_Exposure_Check.get() == 1:
-            var_test.set("auto" + str(camera_auto_Exposure))  # test code
+            camera_status_auto = True
+            #var_test.set("auto" + str(camera_auto_Exposure))  # test code
             spinBox_Exposure.config(state='disabled')
-            SetCamera_Exposure(cam, " ", 'auto')
+            SetCamera_Exposure(cam, camera_auto_Exposure, False)   # manually set back to auto exposure time.
         else:
+            camera_status_auto = False
             if float(val_Exposure.get()) == 0:
                 temp = 1 / (math.pow(2, 13))
             else:
                 temp = float(val_Exposure.get())
-            var_test.set("unauto" + str(camera_auto_Exposure))  # test code
+            #var_test.set("unauto" + str(camera_auto_Exposure))  # test code
             spinBox_Exposure.config(state='normal')
-            SetCamera_Exposure(cam, temp, 'manual')
+            SetCamera_Exposure(cam, temp, camera_status_auto)
         cam.StopLive()
         display_currentImage()
 
-        # re-setup back to default auto.
-        cam = FindCamera()
-        SetCamera_Exposure(cam, float(camera_auto_Exposure), 'manual')
-        cam.StopLive()
-        # print("dd")
-
-    # #################################////////////////////////////////////////////////////////
     checkButton_Exposure = tk.Checkbutton(window_property, text='Auto', variable=val_Exposure_Check, onvalue=1,
                                           offvalue=0, font=('Arial', 12), command=checkButton_Exposure_function)
     checkButton_Exposure.place(x=fourthCol_X + 20, y=start_Y + 3, width=eleWidth_label * 0.5, height=eleHeight_label)
@@ -318,21 +319,10 @@ def createWindowForDeviceProperty():
     label_video.grid()
 
     # Capture from camera
-    # cap = cv2.VideoCapture(1)
-    #cap.set(cv2.CAP_PROP_EXPOSURE, -5)
-    #ret_val, cap_for_exposure = cap.read()
-    #cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.25)  # turn off "auto" on exposure
-    #cap.set(cv2.CAP_PROP_EXPOSURE, -5)
-    #cap.set(cv2.CAP_PROP_AUTO_WB, 0.25)  # turn off "auto" on white balance(gain)
-    # var_test.set(cap.get(cv2.CAP_PROP_EXPOSURE))  # test code
-
-
 
     # display one image with current camera configure.
     def display_currentImage():
         cap = cv2.VideoCapture(1)
-        #cap.set(cv2.CAP_PROP_FPS, 30.0)
-        #cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.75)
         _, frame = cap.read()
         cv2image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGBA)
         h, w, c = cv2image.shape
@@ -342,8 +332,8 @@ def createWindowForDeviceProperty():
         label_video.imgtk = imgtk
         label_video.configure(image=imgtk)
         cap.release()
-
     display_currentImage()
+
     ####################################################################
     # function for video streaming, that is, real time video. Consumes a lot of memory and the operation is insensitive.
     # def setUpExposure():
@@ -382,7 +372,8 @@ def createWindowForDeviceProperty():
 
     # ######## buttons ########
     def button_ok_setting():
-        property_result = [30.0, float(val_Brightness.get()), float(val_Gain.get()), float(val_Exposure.get())]
+        property_result = [window.winfo_children()[4].get(), 30.0, float(val_Brightness.get()), float(val_Gain.get()),
+                           float(val_Exposure.get()), motor_speed]
         p = pathCamera + 'currentProperty.txt'
         with open(p, 'w') as f:
             f.write(" ".join(str(item) for item in property_result))
@@ -406,7 +397,6 @@ def createWindowForDeviceProperty():
 
 
 # #################################################################################################################
-
 
 # set up the contents in window.
 def setUpContents(path_fileName, path_Capture, path_Process):
@@ -436,9 +426,29 @@ def setUpContents(path_fileName, path_Capture, path_Process):
     # ###### "seed category" ########
     start_Y += rowGap
     tk.Label(window, text='Seed Category: ', font=('Arial', fontSize_label)).place(x=start_X, y=start_Y)
-    list_seed_category = ["wheat", "milo", "other"]
+    list_seed_category = ["wheat", "milo", "soybean", "corn", "other"]
+
+    # when change the seed category, the led level will change.
+    def setting_category(event):
+        widget = event.widget
+        value = widget.get()
+        global propertyFile
+        # messagebox.showinfo("showinfo", value) # for test
+        if value == 'wheat':
+            box_light_level.configure(values=["level 1"])
+            box_light_level.current(0)
+            propertyFile = 'default_wheat.txt'
+        elif value == 'milo':
+            box_light_level.configure(values=["level 2"])
+            box_light_level.current(0)
+            propertyFile = 'default_milo.txt'
+        else:
+            box_light_level.configure(values=["level 1", "level 2", "level 3", "level 4"])
+            box_light_level.current(0)
+
     box_seed_category = ttk.Combobox(window, values=list_seed_category, state="readonly",
                                      font=('Arial', fontSize_label))
+    box_seed_category.bind('<<ComboboxSelected>>', setting_category)
     box_seed_category.place(x=secondCol_X, y=start_Y, height=35, width=eleWidth_label)
 
     # ###### "seed type" ############
@@ -459,8 +469,18 @@ def setUpContents(path_fileName, path_Capture, path_Process):
     start_Y += rowGap
     tk.Label(window, text='LED Level: ', font=('Arial', fontSize_label)).place(x=start_X, y=start_Y)
     list_light_level = ["level 1", "level 2", "level 3", "level 4"]
+
+    # when change the led level, the turning speed of Motor will change, based on auto exposure.
+    def setting_ledLevel(event):
+        widget = event.widget
+        value = widget.get()
+        global motor_speed
+        if value == 'level 1':
+            motor_speed = 79
+        else
+            motor_speed = 80
     box_light_level = ttk.Combobox(window, values=list_light_level, state="readonly",
-                                     font=('Arial', fontSize_label))
+                                   font=('Arial', fontSize_label))
     box_light_level.place(x=secondCol_X, y=start_Y, height=35, width=eleWidth_label)
 
     # ###### "whether show 3d model" ##############
@@ -600,8 +620,8 @@ def setUpContents(path_fileName, path_Capture, path_Process):
 # check whether two images are the same or not, to test whether the object moved during the capturing process or not.
 def isSame(dic, num1, num2):
     try:
-        X_1, Y_1, width_1, height_1 = GetArea(dic, 170, num1, "original", middle_original, imageHeight)
-        X_2, Y_2, width_2, height_2 = GetArea(dic, 170, num2, "original", middle_original, imageHeight)
+        X_1, Y_1, width_1, height_1 = GetArea(dic, 170, num1, "original", middle_original)
+        X_2, Y_2, width_2, height_2 = GetArea(dic, 170, num2, "original", middle_original)
         print(X_1, Y_1, width_1, height_1)
         print(X_2, Y_2, width_2, height_2)
         if abs(X_1 - X_2 > 1) or abs(Y_1 - Y_2 > 1) or abs(width_1 - width_2 > 1) or abs(height_1 - height_2 > 1):
@@ -670,7 +690,7 @@ def createUI(path_fileName, path_Capture, path_Process, path_Camera):
     # before the UI works, find and store the default auto exposure value.
     global camera_auto_Exposure  # , camera_manual_Exposure
     cam = FindCamera()
-    camera_auto_Exposure, camera_manual_Exposure = SetCamera(cam, path_Camera, propertyFile, 'auto')
+    camera_auto_Exposure, camera_manual_Exposure = SetCamera(cam, path_Camera, propertyFile, True)
     cam.StopLive()
 
     # create UI
