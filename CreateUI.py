@@ -262,9 +262,11 @@ def createWindowForDeviceProperty():
         v = val_Exposure.get()
         if float(v) == 0:
             v = 0.00001
+        global camera_status_auto
+        camera_status_auto = False
         # set up camera
         cam = FindCamera()
-        SetCamera_Exposure(cam, float(v), False)
+        SetCamera_Exposure(cam, float(v), camera_status_auto)
         cam.StopLive()
         # show image
         display_currentImage()
@@ -476,11 +478,12 @@ def setUpContents(path_fileName, path_Capture, path_Process):
         value = widget.get()
         global motor_speed
         if value == 'level 1':
-            motor_speed = 79
-        else
-            motor_speed = 80
+            motor_speed = motor_speed
+        else:
+            motor_speed = motor_speed + 1
     box_light_level = ttk.Combobox(window, values=list_light_level, state="readonly",
                                    font=('Arial', fontSize_label))
+    box_light_level.bind('<<ComboboxSelected>>', setting_ledLevel)
     box_light_level.place(x=secondCol_X, y=start_Y, height=35, width=eleWidth_label)
 
     # ###### "whether show 3d model" ##############
@@ -510,10 +513,13 @@ def setUpContents(path_fileName, path_Capture, path_Process):
         def write(self, info):  # The info is the output info received by the standard output sys.stdout and sys.stderr.
             # Insert a print message in the last line of the text.
             if info is not None:
-                if info[0] is "[":
-                    text_running.insert('end', ".")
-                else:
-                    text_running.insert('end', info)
+                try:
+                    if info[0] is '[':
+                        text_running.insert('end', ".")
+                    else:
+                        text_running.insert('end', info)
+                except:
+                    print("Print Error", "Some error, please restart!")
 
             # Update the text, otherwise, the inserted information cannot be displayed.
             text_running.update()
@@ -540,10 +546,9 @@ def setUpContents(path_fileName, path_Capture, path_Process):
     def running():
 
         # set up camera
-        # cam = FindCamera(camera_name)
-        # SetCamera(cam, path_Camera, propertyFile, 'manual')
-        #
-        # cam.StopLive()
+        cam = FindCamera()
+        SetCamera(cam, pathCamera, propertyFile, camera_status_auto)
+        cam.StopLive()
 
         # read saving result file
         rowCount, wb = ReadFromResult(path_fileName)
@@ -590,13 +595,15 @@ def setUpContents(path_fileName, path_Capture, path_Process):
         text_display.insert('insert', res_volume)
 
         # display image, to show the first image of 36 images
-        img = Image.open(path_Process + 'ROI_0000.png')
-        new_img = img.resize((eleHeight_text, eleHeight_text))
-        new_img.save(path_Process + 'Z.png')
-        photo = tk.PhotoImage(file=path_Process + 'Z.png')
-        label_image = tk.Label(window, image=photo, width=eleHeight_text, height=eleHeight_text)
-        label_image.place(x=thirdCol_X, y=eleHeight_label)
-
+        try:
+            img = Image.open(path_Process + 'ROI_0000.png')
+            new_img = img.resize((eleHeight_text, eleHeight_text))
+            new_img.save(path_Process + 'Z.png')
+            photo = tk.PhotoImage(file=path_Process + 'Z.png')
+            label_image = tk.Label(window, image=photo, width=eleHeight_text, height=eleHeight_text)
+            label_image.place(x=thirdCol_X, y=eleHeight_label)
+        except:
+            print("Invalid Process!")
         # initial to empty
         # var_usr_name.set(' ')
         # var_seed_type.set(' ')
@@ -640,12 +647,12 @@ def singleTest(name, dic_pro, dic_cap, imageOrFrame, show3D, save, excel_path, e
     isValid = True
     print("** Process --- Capture images **")
     if imageOrFrame == 'video':
-        getImagesFromVideo(dic_cap, middle_original)
+        getImagesFromVideo(dic_cap, middle_original, motor_speed)
         if isSame(dic_cap, 1, 37):
             storeImagesIntoProcess(dic_cap, dic_pro)
             print("** Capturing Images Success! **\n")
         else:
-            getImagesFromVideo(dic_cap, middle_original)
+            getImagesFromVideo(dic_cap, middle_original, motor_speed)
             if isSame(dic_cap, 1, 37):
                 storeImagesIntoProcess(dic_cap, dic_pro)
                 print("** Capturing Images Success! **")

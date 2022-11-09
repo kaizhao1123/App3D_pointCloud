@@ -1,3 +1,5 @@
+from tkinter import messagebox
+
 import numpy as np
 import cv2
 from PIL import Image
@@ -48,29 +50,32 @@ def WriteImage(imgArray, fn, idx):
 ##########################################################
 #   cut off the bottom noisy of the target in the mask images
 def dealWithMaskImage(imgNum, vint, fn):
-    img = cv2.imread(fn.base + '0{:02d}0.png'.format(imgNum))
-    vintValue = vint[0]
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)  # change to gray image
-    res, dst = cv2.threshold(gray, vintValue, 255, 0)  # 0,255 cv2.THRESH_OTSU
-    element = cv2.getStructuringElement(cv2.MORPH_CROSS, (3, 3))  # Morphological denoising
-    dst = cv2.morphologyEx(dst, cv2.MORPH_OPEN, element)  # Open operation denoising
+    try:
+        img = cv2.imread(fn.base + '0{:02d}0.png'.format(imgNum))
+        vintValue = vint[0]
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)  # change to gray image
+        res, dst = cv2.threshold(gray, vintValue, 255, 0)  # 0,255 cv2.THRESH_OTSU
+        element = cv2.getStructuringElement(cv2.MORPH_CROSS, (3, 3))  # Morphological denoising
+        dst = cv2.morphologyEx(dst, cv2.MORPH_OPEN, element)  # Open operation denoising
 
-    contours, hierarchy = cv2.findContours(dst, cv2.RETR_EXTERNAL,
-                                           cv2.CHAIN_APPROX_SIMPLE)  # Contour detection function
-    maxCont = 0
-    for cont in contours:
-        area = cv2.contourArea(cont)  # Calculate the area of the enclosing shape
-        if area < 1000:  # keep the largest one, which is the target.
-            continue
-        maxCont = cont
+        contours, hierarchy = cv2.findContours(dst, cv2.RETR_EXTERNAL,
+                                               cv2.CHAIN_APPROX_SIMPLE)  # Contour detection function
+        maxCont = 0
+        for cont in contours:
+            area = cv2.contourArea(cont)  # Calculate the area of the enclosing shape
+            if area < 1000:  # keep the largest one, which is the target.
+                continue
+            maxCont = cont
 
-    mask = np.zeros_like(img)
-    cv2.drawContours(mask, [maxCont], 0, (255, 255, 255), -1)
-    new_image = cv2.bitwise_and(img, mask)
-    new_image = cv2.cvtColor(new_image, cv2.COLOR_BGR2GRAY)     # array, not image
+        mask = np.zeros_like(img)
+        cv2.drawContours(mask, [maxCont], 0, (255, 255, 255), -1)
+        new_image = cv2.bitwise_and(img, mask)
+        new_image = cv2.cvtColor(new_image, cv2.COLOR_BGR2GRAY)     # array, not image
 
-    img = Image.fromarray(new_image)     # convert array to image
-    img.save(fn.base + '0{:02d}0.png'.format(imgNum))
+        img = Image.fromarray(new_image)     # convert array to image
+        img.save(fn.base + '0{:02d}0.png'.format(imgNum))
+    except:
+        print("Capture Image Error", "Please re-capture images! ")
 
 
 ##########################################################
